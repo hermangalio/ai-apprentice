@@ -84,6 +84,7 @@ export class WarmSession {
   private inFlight: { resolve: (s: string) => void; reject: (e: Error) => void } | null = null;
   private calls = 0;
   private running = false;
+  private closed = false;
 
   private opts: { system: string; model?: LLMRequest["model"]; maxCalls?: number };
 
@@ -91,7 +92,15 @@ export class WarmSession {
     this.opts = opts;
   }
 
+  // Ends the underlying process once the call in flight (if any) has finished.
+  close() {
+    this.closed = true;
+    for (const p of this.pending.splice(0)) p.reject(new Error("WarmSession closed"));
+    if (!this.inFlight) this.wake?.();
+  }
+
   ask(prompt: string, images: LLMImage[] = []): Promise<string> {
+    if (this.closed) return Promise.reject(new Error("WarmSession closed"));
     const msg = {
       type: "user",
       parent_tool_use_id: null,
@@ -125,13 +134,14 @@ export class WarmSession {
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       async function* input(): AsyncGenerator<SDKUserMessage> {
-        while (self.calls < maxCalls) {
+        while (self.calls < maxCalls && !self.closed) {
           if (self.pending.length === 0) {
             // Idle: keep the process warm until the next ask() arrives.
             await new Promise<void>((r) => (self.wake = r));
             self.wake = null;
           }
-          const next = self.pending.shift()!;
+          const next = self.pending.shift();
+          if (!next) return; // woken by close()
           self.inFlight = next;
           self.calls++;
           yield next.msg;
