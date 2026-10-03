@@ -16,9 +16,10 @@ You get the guardrails, the facts of the case on screen, the event that just hap
 For each guardrail listed under "decide", answer with one of:
 - "not_applicable": the rule is not about this case, or the facts needed to tell are missing.
 - "ok": the rule applies and what the learner did respects it.
-- "at_risk": the rule applies and is not satisfied yet, but the learner has not done anything wrong yet.
-- "violated": the learner just set a value or attempted an action that breaks the rule.
-Be conservative: only say "violated" when the facts on hand show it.
+- "at_risk": the rule applies and is not satisfied yet, and the event is not an action (the case was opened, or a field was changed that the rule is not about).
+- "violated": the learner just set a value that breaks the rule, or the event has an "action" that the rule does not allow for this case.
+How to read an action: "save" posts the invoice, "hold" parks it, "send_for_approval" sends it to a second approver. With "committed": false the learner has pressed the button and a confirmation box is open. Judge the action they are about to take: if the rule calls for a different action on this case (for example the rule says to hold and the action is "save" or "send_for_approval"), answer "violated". With "committed": true the action is already saved; judge it the same way.
+Only say "violated" when the facts on hand show that the rule applies to this case.
 Answer with a JSON array: [{"guardrail_id": "...", "status": "...", "explanation": "one short sentence"}]`;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -39,7 +40,7 @@ export async function checkWithModel(
   const out: Pick<CheckResult, "violations" | "atRisk" | "satisfied"> = { violations: [], atRisk: [], satisfied: [] };
   if (undecided.length === 0) return out;
 
-  const session = warmSession(`teach-check:${workMap.sessionId}`, { system: SYSTEM, model: "haiku", maxCalls: 20 });
+  const session = warmSession(`teach-check:v2:${workMap.sessionId}`, { system: SYSTEM, model: "haiku", maxCalls: 20 });
   const prompt = JSON.stringify(
     {
       decide: undecided.map((g) => ({ id: g.id, type: g.type, rule: g.rule, check: g.check, expert_words: g.quote.text })),

@@ -117,7 +117,14 @@ function CaptureSession({ session }: { session: Session }) {
             {interviewer.blockedBy.length > 0 && interviewer.phase === "watching" ? `, waiting: ${interviewer.blockedBy.join(", ")}` : ""}
           </span>
         </div>
-        <VoicePanel ref={voice} mode="interviewer" sessionId={session.id} personName={session.personName} task={session.task} />
+        <VoicePanel
+          ref={voice}
+          mode="interviewer"
+          sessionId={session.id}
+          personName={session.personName}
+          task={session.task}
+          paused={capture.paused}
+        />
       </section>
 
       <section>

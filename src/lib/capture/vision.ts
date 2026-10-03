@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { WarmSession, type LLMImage } from "@/lib/llm";
 import * as store from "@/lib/store";
+import { redact } from "./redact";
 import type { CaseFacts, Frame, ScreenEvent, ScreenEventKind } from "@/lib/types";
 
 // Server-only. Turns uploaded frames into ScreenEvents with one warm vision
@@ -152,7 +153,7 @@ function cleanFacts(raw: unknown): CaseFacts {
   const out: CaseFacts = {};
   for (const k of ["invoice_id", "supplier", "category", "cost_center", "asset_number", "status"] as const) {
     const v = str(r[k], 80);
-    if (v !== undefined) out[k] = v;
+    if (v !== undefined) out[k] = redact(v);
   }
   for (const k of ["supplier_known", "supplier_is_group_company"] as const) {
     if (typeof r[k] === "boolean") out[k] = r[k] as boolean;
@@ -181,8 +182,11 @@ function cleanEvents(raw: unknown): Array<Omit<ScreenEvent, "id" | "t" | "source
   for (const item of raw.slice(0, MAX_EVENTS_PER_FRAME)) {
     if (!item || typeof item !== "object") continue;
     const r = item as Record<string, unknown>;
-    const summary = str(r.summary);
-    if (!summary) continue;
+    // The prompt asks the model to leave personal data out; this masks what
+    // it copies anyway.
+    const rawSummary = str(r.summary);
+    if (!rawSummary) continue;
+    const summary = redact(rawSummary);
     let kind = KINDS.includes(r.kind as ScreenEventKind) ? (r.kind as ScreenEventKind) : "other";
     // A named field with a new value is a field change, whatever the model called it.
     if (kind !== "action" && str(r.field, 60) && (typeof r.after === "string" || typeof r.after === "number")) {
@@ -195,8 +199,8 @@ function cleanEvents(raw: unknown): Array<Omit<ScreenEvent, "id" | "t" | "source
     if (entType && entId) ev.entity = { type: entType, id: entId };
     const field = str(r.field, 60);
     if (field) ev.field = field;
-    if (typeof r.before === "string" || typeof r.before === "number") ev.before = String(r.before).slice(0, 120);
-    if (typeof r.after === "string" || typeof r.after === "number") ev.after = String(r.after).slice(0, 120);
+    if (typeof r.before === "string" || typeof r.before === "number") ev.before = redact(String(r.before)).slice(0, 120);
+    if (typeof r.after === "string" || typeof r.after === "number") ev.after = redact(String(r.after)).slice(0, 120);
     const action = str(r.action, 40);
     if (action) ev.action = action;
     if (typeof r.committed === "boolean") ev.committed = r.committed;
@@ -209,6 +213,39 @@ const clock = (t: number) => {
   const s = Math.max(0, Math.round(t / 1000));
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
+
+// A DOM event arrives before the frame that shows its result has been
+// captured. A frame taken up to this long after the event is taken as that
+// result.
+const RELINK_MS = 5000;
+
+// The frame a DOM event at time t is shown with: the first frame taken at or
+// shortly after t, otherwise the nearest one.
+export function frameForDomEvent(frames: Frame[], t: number): string | undefined {
+  let after: Frame | undefined;
+  let nearest: Frame | undefined;
+  for (const f of frames) {
+    if (f.t >= t && f.t - t <= RELINK_MS && (!after || f.t < after.t)) after = f;
+    if (!nearest || Math.abs(f.t - t) < Math.abs(nearest.t - t)) nearest = f;
+  }
+  return (after ?? nearest)?.id;
+}
+
+// A new frame was stored: DOM events from the few seconds before it that
+// still point at an older frame (or at none) are linked to the new one, so
+// the Work Map shows the screen after the action.
+async function relinkDomEvents(sessionId: string, frame: Frame) {
+  const frameT = new Map((await store.frames.all(sessionId)).map((f) => [f.id, f.t]));
+  await store.events.update(sessionId, (all) =>
+    all.map((e) => {
+      if (e.source !== "dom" || e.t > frame.t || frame.t - e.t > RELINK_MS) return e;
+      const linkedT = e.frameId ? frameT.get(e.frameId) : undefined;
+      // Keep a link to a frame that already shows the result.
+      if (linkedT !== undefined && linkedT >= e.t) return e;
+      return { ...e, frameId: frame.id };
+    }),
+  );
+}
 
 export type FrameResult = { frame: Frame | null; events: ScreenEvent[]; modelMs: number; skipped?: string };
 
@@ -230,6 +267,7 @@ async function processFrameNow(sessionId: string, st: State, jpeg: Buffer, t: nu
   const frame: Frame = { id: store.newId("frm"), t, file: "" };
   frame.file = await store.saveFrameImage(sessionId, frame.id, jpeg);
   await store.frames.append(sessionId, frame);
+  await relinkDomEvents(sessionId, frame);
 
   const image: LLMImage = { base64: jpeg.toString("base64"), mediaType: "image/jpeg" };
   const session = pickSession(st);

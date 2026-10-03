@@ -1,6 +1,7 @@
 import * as store from "@/lib/store";
 import { fail, loadSession, readJSONBody, sessionT } from "@/lib/capture/http";
-import { isPurged } from "@/lib/capture/vision";
+import { redact } from "@/lib/capture/redact";
+import { frameForDomEvent, isPurged } from "@/lib/capture/vision";
 import type { CaseFacts, ScreenEvent, ScreenEventKind } from "@/lib/types";
 
 const KINDS: ScreenEventKind[] = ["open", "navigate", "field_change", "action", "other"];
@@ -15,8 +16,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return Response.json(Number.isFinite(since) && since > 0 ? all.filter((e) => e.t > since) : all);
 }
 
+// Personal data in string facts (for example a supplier that is a private
+// person's email address) is masked the same way as transcript text.
+function redactFacts(facts: CaseFacts): CaseFacts {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(facts)) out[k] = typeof v === "string" ? redact(v) : v;
+  return out as CaseFacts;
+}
+
 // Accepts one DOM event or an array of them from the sandbox ERP. The server
-// assigns id and t (from `wallTime` when present) and attaches the nearest frame.
+// assigns id and t (from `wallTime` when present), masks personal data in
+// summary, before, after and facts, and attaches a frame. A frame stored
+// shortly after the event replaces that link (relinkDomEvents in vision.ts).
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const session = await loadSession(id, { write: true });
@@ -25,15 +36,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!body || typeof body !== "object") return fail(400, "Expected a JSON event or array of events");
 
   const frames = await store.frames.all(id);
-  const nearestFrame = (t: number) => {
-    let best: string | undefined;
-    let bestD = Infinity;
-    for (const f of frames) {
-      const d = Math.abs(f.t - t);
-      if (d < bestD) [best, bestD] = [f.id, d];
-    }
-    return best;
-  };
 
   const out: ScreenEvent[] = [];
   for (const raw of Array.isArray(body) ? body : [body]) {
@@ -50,18 +52,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           ? Math.round(r.t)
           : sessionT(session);
     if (isPurged(id, t)) continue;
-    const ev: ScreenEvent = { id: store.newId("evt"), t, kind, summary: r.summary.trim().slice(0, 300), source: "dom" };
+    const ev: ScreenEvent = { id: store.newId("evt"), t, kind, summary: redact(r.summary.trim()).slice(0, 300), source: "dom" };
     const ent = r.entity as Record<string, unknown> | undefined;
     if (ent && typeof ent.type === "string" && (typeof ent.id === "string" || typeof ent.id === "number")) {
       ev.entity = { type: ent.type, id: String(ent.id) };
     }
     if (typeof r.field === "string") ev.field = r.field;
-    if (typeof r.before === "string" || typeof r.before === "number") ev.before = String(r.before);
-    if (typeof r.after === "string" || typeof r.after === "number") ev.after = String(r.after);
+    if (typeof r.before === "string" || typeof r.before === "number") ev.before = redact(String(r.before));
+    if (typeof r.after === "string" || typeof r.after === "number") ev.after = redact(String(r.after));
     if (typeof r.action === "string") ev.action = r.action;
     if (typeof r.committed === "boolean") ev.committed = r.committed;
-    if (r.facts && typeof r.facts === "object" && !Array.isArray(r.facts)) ev.facts = r.facts as CaseFacts;
-    const frameId = nearestFrame(t);
+    if (r.facts && typeof r.facts === "object" && !Array.isArray(r.facts)) ev.facts = redactFacts(r.facts as CaseFacts);
+    const frameId = frameForDomEvent(frames, t);
     if (frameId) ev.frameId = frameId;
     out.push(ev);
   }

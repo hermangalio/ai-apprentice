@@ -139,14 +139,22 @@ ${SHARED_PROTOCOL}`;
 const str = (description: string, extra: Record<string, unknown> = {}) => ({ type: "string", description, ...extra });
 const bool = (description: string) => ({ type: "boolean", description });
 
-function clientTool(name: string, description: string, properties: Record<string, unknown>, required: string[]) {
+// expectsResponse false: the handler only updates the UI and the store and the
+// agent does not wait. True: the agent waits for the handler's result string
+// (what is still open, or an error) and continues from it.
+function clientTool(
+  name: string,
+  description: string,
+  properties: Record<string, unknown>,
+  required: string[],
+  expectsResponse = false,
+) {
   return {
     type: "client",
     name,
     description,
     parameters: { type: "object", properties, required },
-    // The handlers only update the UI and the store. The agent does not wait.
-    expects_response: false,
+    expects_response: expectsResponse,
     response_timeout_secs: 5,
   };
 }
@@ -164,7 +172,9 @@ const TOOLS: Record<Mode, unknown[]> = {
         }),
       },
       ["gap_id", "status"],
+      true,
     ),
+    // Stays fire-and-forget: waiting on this one made the agent go silent.
     clientTool(
       "teach_back",
       "Call this at the moment you start explaining the process back, with the full text of the explanation you are about to say.",
@@ -179,6 +189,7 @@ const TOOLS: Record<Mode, unknown[]> = {
         correction: str("What the expert corrected, in their own words. Leave out when confirmed."),
       },
       ["confirmed"],
+      true,
     ),
   ],
   tutor: [
@@ -382,7 +393,10 @@ async function main() {
     const got = await api("GET", `/agents/${id}`);
     const cc = got.json?.conversation_config ?? {};
     const prompt = cc.agent?.prompt ?? {};
-    const toolNames = (prompt.tools ?? []).map((t: { name: string; type: string }) => `${t.name} (${t.type})`);
+    const toolNames = (prompt.tools ?? []).map(
+      (t: { name: string; type: string; expects_response?: boolean }) =>
+        `${t.name} (${t.type}${t.type === "client" ? `, expects_response=${t.expects_response}` : ""})`,
+    );
     console.log(
       `${mode}: ${existing ? "updated" : "created"} ${id}\n` +
         `  llm=${prompt.llm} tts=${cc.tts?.model_id} voice=${cc.tts?.voice_id} expressive=${cc.tts?.expressive_mode}\n` +

@@ -249,6 +249,11 @@ export function pickQuestion(questions: Question[], events: ScreenEvent[], now: 
 type Analysis = { key: string; candidates: Candidate[]; explainedIds: string[]; source: "llm" | "rules" };
 const cache = ((globalThis as Record<string, unknown>).__voiceQuestionCache ??= new Map()) as Map<string, Analysis>;
 
+// Off the record: the cached analysis may hold candidates about purged events.
+export function forgetQuestionAnalysis(sessionId: string) {
+  cache.delete(sessionId);
+}
+
 export async function nextQuestion(
   input: NextQuestionInput,
   opts: { cacheKey?: string; useLLM?: boolean; timeoutMs?: number } = {},

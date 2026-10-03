@@ -1,3 +1,4 @@
+import { redact } from "../capture/redact";
 import type { Phase, ScreenEvent, Speaker } from "../types";
 
 // Shared by the voice client code. The agent prompts (scripts/setup-agents.mts)
@@ -24,8 +25,10 @@ export const askInstruction = (question: string) => `${APP_PREFIX} Ask: ${questi
 export const appInstruction = (instruction: string) =>
   instruction.startsWith(APP_PREFIX) ? instruction : `${APP_PREFIX} ${instruction}`;
 
-export const screenUpdate = (e: Pick<ScreenEvent, "summary">) => `Screen: ${e.summary}`;
-export const heardUpdate = (text: string) => `Heard: ${text}`;
+// Context lines for the agent. Emails, phone numbers, IBANs and card numbers
+// are masked before the text leaves the browser.
+export const screenUpdate = (e: Pick<ScreenEvent, "summary">) => `Screen: ${redact(e.summary)}`;
+export const heardUpdate = (text: string) => `Heard: ${redact(text)}`;
 
 // Expressive Mode lets the model put delivery tags such as [curious] in its
 // text. They are not part of what was said.

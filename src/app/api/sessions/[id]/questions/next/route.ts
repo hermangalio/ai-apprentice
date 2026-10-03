@@ -45,6 +45,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   );
 
   if (!dryRun) {
+    // Events can be taken off the record while the analysis runs. Questions
+    // about events that are gone by now are not stored and not asked.
+    const still = new Set((await store.events.all(id)).map((e) => e.id));
+    const gone = (q: Question) => q.eventIds.some((eid) => !still.has(eid));
+    result.upserts = result.upserts.filter((q) => !gone(q));
+    if (result.question && gone(result.question)) {
+      result.question = null;
+      result.reason = "The moment was taken off the record";
+    }
     // Sequential: store writes to one file are serialized anyway.
     for (const q of result.upserts) await store.questions.upsert(id, q);
   }

@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ERP_CONTROL,
+  actionCancelledSummary,
+  actionRequestedSummary,
   actionSummary,
   emitErpEvent,
   fieldChangeSummary,
@@ -17,6 +19,8 @@ import {
   poOpenedSummary,
   queueOpenedSummary,
   type ErpAction,
+  type ErpCoachSeverity,
+  type ErpConfirmAction,
   type ErpControlMessage,
 } from "@/lib/erp/events";
 import { COST_CENTERS, type EditableFields, type ErpSet, type Invoice, type InvoiceStatus } from "@/lib/erp/seed";
@@ -51,6 +55,44 @@ const FIELD_NAME: Record<keyof EditableFields, string> = {
 };
 
 const HIGHLIGHT_MS = 4000;
+// Every confirm button is armed after this pause, so a tutor message sent in
+// reply to the request can arrive before the first possible click.
+const CONFIRM_ARM_MS = 700;
+// Time to read or hear a "stop" coach message before confirming is possible.
+const COACH_READ_MS = 4000;
+
+// A tutor message received on the control channel.
+type Coach = { id: number; text: string; field?: string; severity: ErpCoachSeverity; at: number };
+
+const normalizeField = (field: string) => field.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+// Wording and colors of the confirmation box, per action.
+const CONFIRM: Record<ErpConfirmAction, { label: string; title: (id: string) => string; note: string; confirm: string; box: string; button: string }> = {
+  save: {
+    label: "Confirm posting",
+    title: (id) => `Post invoice ${id}?`,
+    note: "Not posted yet. Posting cannot be undone without reopening.",
+    confirm: "Confirm posting",
+    box: "border-green-700 bg-green-50",
+    button: "bg-green-700 text-white hover:bg-green-800",
+  },
+  hold: {
+    label: "Confirm hold",
+    title: (id) => `Put invoice ${id} on hold?`,
+    note: "Not on hold yet. A held invoice stays unposted until it is reopened.",
+    confirm: "Confirm hold",
+    box: "border-amber-600 bg-amber-50",
+    button: "bg-amber-500 text-black hover:bg-amber-600",
+  },
+  send_for_approval: {
+    label: "Confirm sending for second approval",
+    title: (id) => `Send invoice ${id} for second approval?`,
+    note: "Not sent yet. A sent invoice waits for the second approver until it is reopened.",
+    confirm: "Confirm sending",
+    box: "border-blue-700 bg-blue-50",
+    button: "bg-blue-700 text-white hover:bg-blue-800",
+  },
+};
 const TEXT_SETTLE_MS = 800; // a text field counts as changed after this pause in typing
 const TYPING_PING_MS = 1000;
 
@@ -71,6 +113,8 @@ export default function ErpPage() {
   const state = useSyncExternalStore(erpStore.subscribe, erpStore.getSnapshot, erpStore.getServerSnapshot);
   const [openId, setOpenId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [coach, setCoach] = useState<Coach | null>(null);
+  const coachSeq = useRef(0);
   const started = useRef(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,6 +127,7 @@ export default function ErpPage() {
   const showQueue = useCallback(() => {
     const s = erpStore.getSnapshot();
     if (!s) return;
+    setCoach(null); // a coach message belongs to the invoice it was sent for
     setOpenId(null);
     writeUrl(s.set, null);
     emitErpEvent({ kind: "open", summary: queueOpenedSummary(s.sets[s.set]) });
@@ -93,6 +138,7 @@ export default function ErpPage() {
       const found = erpStore.find(id);
       if (!found) return;
       erpStore.setSet(found.set);
+      setCoach(null);
       setOpenId(id);
       writeUrl(found.set, id);
       emitErpEvent({ kind: "open", summary: invoiceOpenedSummary(found.invoice) }, found.invoice);
@@ -124,7 +170,7 @@ export default function ErpPage() {
     }
   }, [openInvoice, writeUrl]);
 
-  // Control channel: coaching highlight and remote navigation.
+  // Control channel: coaching highlight, tutor banner and remote navigation.
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
     const control = new BroadcastChannel(ERP_CONTROL);
@@ -132,13 +178,23 @@ export default function ErpPage() {
       const msg = e.data;
       if (!msg || typeof msg !== "object") return;
       if (msg.type === "highlight" && typeof msg.field === "string") {
-        const field = msg.field.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        const field = normalizeField(msg.field);
         setHighlight(field);
         if (highlightTimer.current) clearTimeout(highlightTimer.current);
         highlightTimer.current = setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
         document.querySelector(`[data-erp-field="${CSS.escape(field)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
       } else if (msg.type === "open_invoice" && typeof msg.id === "string") {
         openInvoice(String(msg.id));
+      } else if (msg.type === "coach" && typeof msg.text === "string" && msg.text.trim()) {
+        setCoach({
+          id: ++coachSeq.current,
+          text: msg.text.trim(),
+          field: typeof msg.field === "string" && msg.field.trim() ? normalizeField(msg.field) : undefined,
+          severity: msg.severity === "stop" ? "stop" : "hint",
+          at: Date.now(),
+        });
+      } else if (msg.type === "coach_clear") {
+        setCoach(null);
       }
     };
     return () => control.close();
@@ -195,7 +251,14 @@ export default function ErpPage() {
       </header>
 
       {current ? (
-        <InvoiceDetail key={current.id} invoice={current} highlight={highlight} onBack={showQueue} />
+        <InvoiceDetail
+          key={current.id}
+          invoice={current}
+          highlight={highlight ?? coach?.field ?? null}
+          coach={coach}
+          onDismissCoach={() => setCoach(null)}
+          onBack={showQueue}
+        />
       ) : (
         <Queue invoices={invoices} onOpen={openInvoice} />
       )}
@@ -276,10 +339,53 @@ function Fact({ label, field, highlight, children }: { label: string; field?: st
   );
 }
 
-function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highlight: string | null; onBack: () => void }) {
+// Tutor message. Shown inside the confirmation box when one is open,
+// otherwise at the top of the invoice.
+function CoachBanner({ coach, onDismiss }: { coach: Coach; onDismiss: () => void }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [coach.id]);
+  const stop = coach.severity === "stop";
+  return (
+    <div
+      ref={ref}
+      role="alert"
+      data-testid="coach-banner"
+      data-coach-severity={coach.severity}
+      className={`flex items-start gap-4 rounded-lg border-4 p-4 ${stop ? "border-orange-600 bg-orange-100" : "border-sky-700 bg-sky-50"}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className={`text-sm font-bold uppercase tracking-wide ${stop ? "text-orange-900" : "text-sky-900"}`}>
+          {stop ? "Tutor: stop, nothing is saved yet" : "Tutor"}
+        </div>
+        <div className="mt-1 text-2xl font-bold text-slate-900">{coach.text}</div>
+      </div>
+      <button type="button" onClick={onDismiss} className="shrink-0 rounded border-2 border-slate-900 bg-white px-3 py-1 text-base font-semibold">
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+function InvoiceDetail({
+  invoice,
+  highlight,
+  coach,
+  onDismissCoach,
+  onBack,
+}: {
+  invoice: Invoice;
+  highlight: string | null;
+  coach: Coach | null;
+  onDismissCoach: () => void;
+  onBack: () => void;
+}) {
   const [showPo, setShowPo] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  // The action waiting in the confirmation box, and when the box was opened.
+  const [pending, setPending] = useState<{ action: ErpConfirmAction; at: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   // Last value reported in a field_change event, per text field.
   const reported = useRef<EditableFields>({ ...invoice.draft });
   const timers = useRef<Partial<Record<keyof EditableFields, ReturnType<typeof setTimeout>>>>({});
@@ -351,26 +457,49 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
     emitErpEvent({ kind: "action", summary: actionSummary(action, inv), action, committed: true }, inv);
   };
 
-  // Posting is a two-step action, as in most ERPs: Post opens a review
-  // dialog and nothing is saved until it is confirmed. The request is
-  // reported as an uncommitted action so an observer sees the intent first.
-  const requestPost = () => {
+  // Post, Hold and Send for second approval are two-step actions, as in most
+  // ERPs: the button opens a confirmation box and nothing is saved until it
+  // is confirmed. The request is reported as an uncommitted action so an
+  // observer sees the intent first. The ERP itself checks no business rule.
+  const requestAction = (action: ErpConfirmAction) => {
     flushAll();
     const inv = erpStore.find(id)?.invoice;
     if (!inv) return;
-    setConfirming(true);
-    emitErpEvent({ kind: "action", summary: `Posting of invoice ${inv.id} requested, confirmation open`, action: "save", committed: false }, inv);
+    const at = Date.now();
+    setPending({ action, at });
+    setNow(at);
+    emitErpEvent({ kind: "action", summary: actionRequestedSummary(action, inv), action, committed: false }, inv);
   };
 
-  const cancelPost = () => {
-    setConfirming(false);
-    emitErpEvent({ kind: "other", summary: `Posting of invoice ${id} cancelled`, committed: false }, invoice);
+  const cancelAction = () => {
+    if (!pending) return;
+    setPending(null);
+    emitErpEvent({ kind: "other", summary: actionCancelledSummary(pending.action, invoice), committed: false }, invoice);
   };
 
-  const confirmPost = () => {
-    setConfirming(false);
-    act("save");
+  const confirmAction = () => {
+    if (!pending) return;
+    setPending(null);
+    act(pending.action);
   };
+
+  // Clock for the confirm button while the confirmation box is open.
+  const confirmOpen = pending !== null;
+  useEffect(() => {
+    if (!confirmOpen) return;
+    const timer = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(timer);
+  }, [confirmOpen]);
+
+  // While a "stop" coach message is showing, confirming waits COACH_READ_MS
+  // from the later of: message received, box opened. After that the button
+  // works again, so the learner can still go ahead.
+  const stopCoach = coach && coach.severity === "stop" ? coach : null;
+  const unlockAt = pending
+    ? Math.max(pending.at + CONFIRM_ARM_MS, stopCoach ? Math.max(stopCoach.at, pending.at) + COACH_READ_MS : 0)
+    : 0;
+  const confirmWaitMs = Math.max(0, unlockAt - now);
+  const countdown = stopCoach && confirmWaitMs > 0 ? Math.min(Math.ceil(COACH_READ_MS / 1000), Math.ceil(confirmWaitMs / 1000)) : 0;
 
   const togglePo = () => {
     const next = !showPo;
@@ -397,6 +526,7 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
 
   return (
     <div className="flex flex-col gap-5">
+      {coach && !(pending && !locked) && <CoachBanner coach={coach} onDismiss={onDismissCoach} />}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button type="button" onClick={onBack} className="rounded border-2 border-slate-900 bg-white px-4 py-2 text-lg font-semibold">
@@ -519,7 +649,7 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
                 <button
                   type="button"
                   data-erp-field="save"
-                  onClick={requestPost}
+                  onClick={() => requestAction("save")}
                   className={`rounded bg-green-700 px-6 py-3 text-xl font-bold text-white hover:bg-green-800 ${hl("save")}`}
                 >
                   Post
@@ -527,7 +657,7 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
                 <button
                   type="button"
                   data-erp-field="hold"
-                  onClick={() => act("hold")}
+                  onClick={() => requestAction("hold")}
                   className={`rounded bg-amber-500 px-6 py-3 text-xl font-bold text-black hover:bg-amber-600 ${hl("hold")}`}
                 >
                   Hold
@@ -535,7 +665,7 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
                 <button
                   type="button"
                   data-erp-field="send_for_approval"
-                  onClick={() => act("send_for_approval")}
+                  onClick={() => requestAction("send_for_approval")}
                   className={`rounded bg-blue-700 px-6 py-3 text-xl font-bold text-white hover:bg-blue-800 ${hl("send_for_approval")}`}
                 >
                   Send for second approval
@@ -543,24 +673,41 @@ function InvoiceDetail({ invoice, highlight, onBack }: { invoice: Invoice; highl
               </>
             )}
           </div>
-          {confirming && !locked && (
-            <div role="dialog" aria-label="Confirm posting" className="mt-4 rounded-lg border-4 border-green-700 bg-green-50 p-5">
-              <div className="text-2xl font-bold">Post invoice {invoice.id}?</div>
-              <div className="mt-2 text-xl">
-                {invoice.supplier.name}, {formatEUR(invoice.amount)}. Cost center {costCenterLabel(invoice.draft.costCenter)}
-                {invoice.draft.assetNumber ? `, asset number ${invoice.draft.assetNumber}` : ", no asset number"}.
+          {pending && !locked && (() => {
+            const c = CONFIRM[pending.action];
+            return (
+              <div role="dialog" aria-label={c.label} data-testid="confirm-box" className={`mt-4 rounded-lg border-4 p-5 ${c.box}`}>
+                {coach && (
+                  <div className="mb-4">
+                    <CoachBanner coach={coach} onDismiss={onDismissCoach} />
+                  </div>
+                )}
+                <div className="text-2xl font-bold">{c.title(invoice.id)}</div>
+                <div className="mt-2 text-xl">
+                  {invoice.supplier.name}, {formatEUR(invoice.amount)}. Cost center {costCenterLabel(invoice.draft.costCenter)}
+                  {invoice.draft.assetNumber ? `, asset number ${invoice.draft.assetNumber}` : ", no asset number"}.
+                </div>
+                <div className="mt-1 text-lg text-slate-700">{c.note}</div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    data-erp-field={`confirm_${pending.action}`}
+                    onClick={confirmAction}
+                    disabled={confirmWaitMs > 0}
+                    className={`rounded px-6 py-3 text-xl font-bold disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white ${c.button}`}
+                  >
+                    {countdown > 0 ? `${c.confirm} (wait ${countdown} s)` : c.confirm}
+                  </button>
+                  <button type="button" onClick={cancelAction} className="rounded border-2 border-slate-900 bg-white px-6 py-3 text-xl font-semibold">
+                    Cancel
+                  </button>
+                  {countdown > 0 && (
+                    <span className="text-lg font-semibold text-orange-900">Read the tutor message first. You can confirm in {countdown} s.</span>
+                  )}
+                </div>
               </div>
-              <div className="mt-1 text-lg text-slate-700">Not posted yet. Posting cannot be undone without reopening.</div>
-              <div className="mt-4 flex gap-3">
-                <button type="button" data-erp-field="confirm_save" onClick={confirmPost} className="rounded bg-green-700 px-6 py-3 text-xl font-bold text-white hover:bg-green-800">
-                  Confirm posting
-                </button>
-                <button type="button" onClick={cancelPost} className="rounded border-2 border-slate-900 bg-white px-6 py-3 text-xl font-semibold">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </section>
       </div>
 

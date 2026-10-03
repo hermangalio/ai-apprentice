@@ -90,6 +90,8 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
     // comes late (the expert finished a thought first) is still linked to it.
     unanswered: null as { question: Question; askedAt: number } | null,
     force: false,
+    // True once the open question and the microphone were shut for a disabled spell.
+    shut: false,
   });
 
   const patch = useCallback((next: Partial<InterviewerState>) => {
@@ -162,12 +164,27 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
   useEffect(() => {
     if (!run.current.startedAt) run.current.startedAt = Date.now();
     const tick = () => {
-      if (!enabled) {
-        patch({ phase: "off", blockedBy: [] });
-        return;
-      }
       const r = run.current;
       const v = voiceRef.current;
+      if (!enabled) {
+        // Paused or off the record: stop listening at once and give up the
+        // question that was out. It keeps its stored status ("asked", so the
+        // debrief picks it up) unless the off-the-record purge removes it.
+        // A question chosen earlier is not reused: it may be about moments
+        // that have just been purged.
+        if (!r.shut) {
+          r.shut = true;
+          v?.closeMic();
+          r.asking = null;
+          r.unanswered = null;
+          r.fetched = null;
+          r.force = false;
+          r.version++;
+        }
+        patch({ phase: "off", blockedBy: [], current: null });
+        return;
+      }
+      r.shut = false;
       const o = optsRef.current;
       if (!v || v.status !== "connected") {
         patch({ phase: "off", blockedBy: [] });

@@ -56,6 +56,10 @@ function list<T extends { id: string }>(name: string) {
         return i < 0 ? [...items, item] : items.map((x, j) => (j === i ? item : x));
       }),
     replaceAll: (sessionId: string, items: T[]) => writeJSON(sessionId, name, () => items),
+    // Read, change and write under the file lock, so appends made at the same
+    // time are not lost.
+    update: (sessionId: string, change: (items: T[]) => T[]) =>
+      writeJSON(sessionId, name, (cur) => change((cur as T[]) ?? [])),
   };
 }
 
@@ -103,13 +107,47 @@ export async function readFrameImage(sessionId: string, frameId: string) {
   return fs.readFile(path.join(await sessionDir(sessionId), "frames", `${frameId}.jpg`));
 }
 
+export type PurgeCounts = { frames: number; events: number; transcript: number; questions: number };
+
 // Off the record: drop everything captured in [fromT, toT] from every stream.
-export async function purgeWindow(sessionId: string, fromT: number, toT: number) {
+// Questions are derived from events, so a question goes too when it is about
+// a purged event or was asked inside the window. Returns what was removed.
+export async function purgeWindow(sessionId: string, fromT: number, toT: number): Promise<PurgeCounts> {
   const inWindow = (x: { t: number }) => x.t >= fromT && x.t <= toT;
-  const dropped = (await frames.all(sessionId)).filter(inWindow);
+  const counts: PurgeCounts = { frames: 0, events: 0, transcript: 0, questions: 0 };
   const dir = await sessionDir(sessionId);
-  await Promise.all(dropped.map((f) => fs.rm(path.join(dir, f.file), { force: true })));
-  await frames.replaceAll(sessionId, (await frames.all(sessionId)).filter((x) => !inWindow(x)));
-  await events.replaceAll(sessionId, (await events.all(sessionId)).filter((x) => !inWindow(x)));
-  await transcript.replaceAll(sessionId, (await transcript.all(sessionId)).filter((x) => !inWindow(x)));
+
+  const droppedFrames: Frame[] = [];
+  await frames.update(sessionId, (all) => all.filter((f) => (inWindow(f) ? (droppedFrames.push(f), false) : true)));
+  await Promise.all(droppedFrames.map((f) => fs.rm(path.join(dir, f.file), { force: true })));
+  counts.frames = droppedFrames.length;
+
+  const eventIds = new Set<string>();
+  await events.update(sessionId, (all) => all.filter((e) => (inWindow(e) ? (eventIds.add(e.id), false) : true)));
+  counts.events = eventIds.size;
+
+  const transcriptIds = new Set<string>();
+  await transcript.update(sessionId, (all) => all.filter((x) => (inWindow(x) ? (transcriptIds.add(x.id), false) : true)));
+  counts.transcript = transcriptIds.size;
+
+  await questions.update(sessionId, (all) => {
+    const kept: Question[] = [];
+    for (const q of all) {
+      const aboutPurged = q.eventIds.some((id) => eventIds.has(id));
+      const askedInWindow = q.askedAt !== undefined && q.askedAt >= fromT && q.askedAt <= toT;
+      if (aboutPurged || askedInWindow) {
+        counts.questions++;
+        continue;
+      }
+      // The question stays but an answer given inside the window is gone.
+      const answers = q.answerTranscriptIds?.filter((id) => !transcriptIds.has(id));
+      if (answers && answers.length !== q.answerTranscriptIds!.length) {
+        kept.push({ ...q, answerTranscriptIds: answers, status: q.status === "answered" && answers.length === 0 ? "asked" : q.status });
+      } else {
+        kept.push(q);
+      }
+    }
+    return kept;
+  });
+  return counts;
 }

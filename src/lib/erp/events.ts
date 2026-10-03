@@ -13,9 +13,17 @@ export const ERP_CONTROL = "erp-control";
 // converts it to session time `t` and assigns `id`.
 export type ErpDomEvent = Omit<ScreenEvent, "id" | "t" | "frameId"> & { wallTime: number };
 
+// "stop": the learner is about to do something the tutor wants to question;
+// the ERP delays the confirm button for a few seconds. "hint": no delay.
+export type ErpCoachSeverity = "stop" | "hint";
+
 export type ErpControlMessage =
   | { type: "highlight"; field: string }
-  | { type: "open_invoice"; id: string };
+  | { type: "open_invoice"; id: string }
+  // Tutor banner shown in the ERP tab. A new coach message replaces the one
+  // on screen. `field` is highlighted for as long as the banner is shown.
+  | { type: "coach"; text: string; field?: string; severity?: ErpCoachSeverity }
+  | { type: "coach_clear" };
 
 // Field names accepted by the "highlight" control message.
 export const ERP_HIGHLIGHT_FIELDS = [
@@ -126,6 +134,32 @@ export function fieldChangeSummary(field: string, before: string, after: string)
 }
 
 export type ErpAction = "save" | "hold" | "send_for_approval" | "reopen";
+
+// Actions that go through the confirmation box before anything is saved.
+export type ErpConfirmAction = Exclude<ErpAction, "reopen">;
+
+// Summary of the uncommitted action event sent when the confirmation box opens.
+export function actionRequestedSummary(action: ErpConfirmAction, invoice: Invoice): string {
+  switch (action) {
+    case "save":
+      return `Posting of invoice ${invoice.id} requested, confirmation open`;
+    case "hold":
+      return `Hold of invoice ${invoice.id} requested, confirmation open`;
+    case "send_for_approval":
+      return `Second approval of invoice ${invoice.id} requested, confirmation open`;
+  }
+}
+
+export function actionCancelledSummary(action: ErpConfirmAction, invoice: Invoice): string {
+  switch (action) {
+    case "save":
+      return `Posting of invoice ${invoice.id} cancelled`;
+    case "hold":
+      return `Hold of invoice ${invoice.id} cancelled`;
+    case "send_for_approval":
+      return `Second approval of invoice ${invoice.id} cancelled`;
+  }
+}
 
 export function actionSummary(action: ErpAction, invoice: Invoice): string {
   switch (action) {

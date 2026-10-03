@@ -51,6 +51,9 @@ export type VoicePanelProps = {
   autoKickoff?: boolean;
   // Show the Start/Stop buttons. Turn off when the page drives the handle.
   controls?: boolean;
+  // Paused or off the record. While true the microphone reaches neither Scribe
+  // nor the agent, nothing is stored and no context is sent.
+  paused?: boolean;
   className?: string;
   ref?: Ref<VoicePanelHandle>;
 };
@@ -81,6 +84,7 @@ function VoicePanelInner({
   task,
   autoKickoff = true,
   controls = true,
+  paused = false,
   className,
   ref,
 }: VoicePanelProps) {
@@ -95,6 +99,10 @@ function VoicePanelInner({
   const [gateOpen, setGateOpen] = useState(false);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [draft, setDraft] = useState("");
+  // Why Scribe is not running, when connecting it failed.
+  const [scribeProblem, setScribeProblem] = useState<string | undefined>();
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // Mutable state read by timers and by the handle.
   const live = useRef({
@@ -140,7 +148,7 @@ function VoicePanelInner({
     (): VoiceState => ({
       status: live.current.status,
       agentSpeaking: live.current.agentSpeaking,
-      micOpen: gated ? live.current.gateOpen : true,
+      micOpen: pausedRef.current ? false : gated ? live.current.gateOpen : true,
       lastUserSpeechAt: live.current.lastUserSpeechAt,
       lastAgentSpeechAt: live.current.lastAgentSpeechAt,
       scribe: scribeStatusRef.current,
@@ -155,6 +163,7 @@ function VoicePanelInner({
   // Every final utterance goes to the session transcript.
   const record = useCallback(
     (speaker: Speaker, text: string) => {
+      if (pausedRef.current) return; // off the record: not shown, not stored
       const at = Date.now();
       addLine(speaker === "agent" ? "agent" : "person", text);
       const started = live.current.startedAtMs;
@@ -174,10 +183,11 @@ function VoicePanelInner({
   );
 
   const conversation = useConversation({
-    micMuted: textOnly ? undefined : gated ? !gateOpen : false,
+    // Paused: the agent hears nothing and is not played, whatever the policy.
+    micMuted: textOnly ? undefined : paused ? true : gated ? !gateOpen : false,
     // Gated: anything the agent says outside a question window is not played.
     // (Text conversations have no audio: setVolume throws there.)
-    volume: textOnly ? undefined : gated && !gateOpen ? 0 : 1,
+    volume: textOnly ? undefined : paused || (gated && !gateOpen) ? 0 : 1,
     onConnect: () => {
       live.current.status = "connected";
       setStatus("connected");
@@ -203,10 +213,13 @@ function VoicePanelInner({
       emitState();
     },
     onVadScore: ({ vadScore }) => {
+      if (pausedRef.current) return;
       // Open policy: the agent's own voice activity score is the speech signal.
       if (!gated && vadScore > 0.6 && !live.current.agentSpeaking) live.current.lastUserSpeechAt = Date.now();
     },
     onMessage: ({ message, role }) => {
+      // Paused: whatever still arrives belongs to the off-the-record spell.
+      if (pausedRef.current) return;
       if (role === "agent") {
         const text = cleanAgentText(message);
         if (!text) return;
@@ -223,9 +236,11 @@ function VoicePanelInner({
       if (message.startsWith(APP_PREFIX) || isEmptyUtterance(message)) return;
       if (message === live.current.lastSentText) return; // already recorded by sendText
       live.current.lastUserSpeechAt = Date.now();
-      // Gated with Scribe running: Scribe is the transcript source, so the
-      // agent's own transcription of the same words is dropped.
-      if (gated && scribeStatusRef.current !== "off" && scribeStatusRef.current !== "error") return;
+      // Gated with Scribe connected: Scribe is the transcript source, so the
+      // agent's own transcription of the same words is dropped. In any other
+      // Scribe state (still connecting, token or connection failure, dropped)
+      // the agent's transcription is the only record of the answer.
+      if (gated && (scribeStatusRef.current === "connected" || scribeStatusRef.current === "transcribing")) return;
       record(human, message.trim());
     },
   });
@@ -233,22 +248,29 @@ function VoicePanelInner({
   convRef.current = conversation;
 
   const sendContext = useCallback((text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || pausedRef.current) return; // paused: dropped, not queued
     if (live.current.status === "connected") convRef.current.sendContextualUpdate(text);
     else live.current.pendingContext.push(text);
   }, []);
 
   // Scribe v2 Realtime: continuous transcript and speech activity while the
   // agent's microphone is muted.
+  // True while a Scribe disconnect is one this panel asked for.
+  const scribeClosing = useRef(false);
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
+    onDisconnect: () => {
+      // The connection dropped by itself: speech is no longer transcribed.
+      if (!scribeClosing.current) setScribeProblem("the connection closed");
+    },
     commitStrategy: CommitStrategy.VAD,
     vadSilenceThresholdSecs: 1.0,
     onPartialTranscript: ({ text }) => {
-      if (!text.trim() || live.current.agentSpeaking) return;
+      if (pausedRef.current || !text.trim() || live.current.agentSpeaking) return;
       live.current.lastUserSpeechAt = Date.now();
     },
     onCommittedTranscript: ({ text }) => {
+      if (pausedRef.current) return; // a result that was in flight when paused
       const said = text.trim();
       if (!said || isEmptyUtterance(said)) return;
       if (soundsLike(said, live.current.lastAgentText)) return; // the agent's own voice through the speakers
@@ -267,7 +289,8 @@ function VoicePanelInner({
   }, [scribe.status, emitState]);
 
   const setGate = useCallback(
-    (open: boolean) => {
+    (wanted: boolean) => {
+      const open = wanted && !pausedRef.current; // never opens while paused
       live.current.gateOpen = open;
       setGateOpen(open);
       emitState();
@@ -281,6 +304,7 @@ function VoicePanelInner({
     live.current.error = undefined;
     setStatus("connecting");
     setError(undefined);
+    setScribeProblem(undefined);
     emitState();
     try {
       const res = await fetch(`/api/voice/token?agent=${mode}`);
@@ -318,30 +342,65 @@ function VoicePanelInner({
           addLine("note", `${call.tool_name}(${JSON.stringify(call.parameters)}) has no handler`),
       });
 
-      if (gated) {
-        const tokenRes = await fetch("/api/voice/token?agent=scribe");
-        const { token } = await tokenRes.json();
-        if (token) {
-          await scribeRef.current.connect({
-            token,
-            microphone: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          });
-        }
-      }
+      // Scribe is connected by the effect below once the agent is connected.
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      // A Scribe failure leaves the agent connection usable.
-      if ((live.current.status as VoiceStatus) !== "connected") {
-        live.current.status = "error";
-        setStatus("error");
-      }
+      live.current.status = "error";
+      setStatus("error");
       live.current.error = message;
       setError(message);
       emitState();
     }
-  }, [addLine, emitState, gated, mode, textOnly]);
+  }, [addLine, emitState, mode, textOnly]);
+
+  // Scribe follows the agent connection and the pause state. It runs only
+  // while the agent is connected and the panel is not paused. Pausing closes
+  // the Scribe connection, which also releases its microphone stream, so no
+  // audio leaves the browser; resuming connects again with a new token.
+  const scribeWanted = gated && status === "connected" && !paused;
+  useEffect(() => {
+    if (!scribeWanted) return;
+    let ended = false;
+    const current = () => !ended;
+    (async () => {
+      try {
+        const res = await fetch("/api/voice/token?agent=scribe");
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || !body.token) throw new Error(body.error ?? `Scribe token request returned ${res.status}`);
+        if (!current()) return;
+        scribeClosing.current = false;
+        await scribeRef.current.connect({
+          token: body.token,
+          microphone: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        // Paused or stopped while connecting: close it again.
+        if (!current()) {
+          scribeClosing.current = true;
+          scribeRef.current.disconnect();
+        } else setScribeProblem(undefined);
+      } catch (err) {
+        if (current()) setScribeProblem(err instanceof Error ? err.message : String(err));
+      }
+    })();
+    return () => {
+      ended = true;
+      scribeClosing.current = true;
+      try {
+        scribeRef.current.disconnect();
+      } catch {}
+    };
+  }, [scribeWanted]);
+
+  // Pausing closes an open question window and drops context that was queued.
+  useEffect(() => {
+    if (!paused) return;
+    live.current.pendingContext.length = 0;
+    setGate(false);
+    return () => emitState();
+  }, [paused, setGate, emitState]);
 
   const stop = useCallback(async () => {
+    scribeClosing.current = true;
     try {
       scribeRef.current.disconnect();
     } catch {}
@@ -351,7 +410,7 @@ function VoicePanelInner({
 
   const speak = useCallback(
     (instruction: string) => {
-      if (live.current.status !== "connected") return;
+      if (live.current.status !== "connected" || pausedRef.current) return;
       if (gated) setGate(true);
       convRef.current.sendUserMessage(appInstruction(instruction));
     },
@@ -361,7 +420,7 @@ function VoicePanelInner({
   const sendText = useCallback(
     (text: string) => {
       const said = text.trim();
-      if (!said || live.current.status !== "connected") return;
+      if (!said || live.current.status !== "connected" || pausedRef.current) return;
       live.current.lastSentText = said;
       live.current.lastUserSpeechAt = Date.now();
       record(human, said);
@@ -409,6 +468,7 @@ function VoicePanelInner({
   // End the session when the panel goes away.
   useEffect(
     () => () => {
+      scribeClosing.current = true;
       try {
         scribeRef.current.disconnect();
       } catch {}
@@ -423,7 +483,17 @@ function VoicePanelInner({
   }, [lines, scribe.partialTranscript]);
 
   const connected = status === "connected";
-  const activity = !connected
+  // Scribe is the only transcript source while the question window is closed.
+  // Say so when it is not running: its error state, a failed connect, or a
+  // connection that dropped.
+  const scribeDown =
+    gated &&
+    connected &&
+    !paused &&
+    (scribe.status === "error" || !!scribeProblem || (scribe.status === "disconnected" && !!scribe.error));
+  const activity = paused
+    ? "Paused, microphone off"
+    : !connected
     ? status === "connecting"
       ? "Connecting"
       : status === "error"
@@ -438,7 +508,9 @@ function VoicePanelInner({
             ? "Listening for your answer"
             : "Quiet while you work"
           : "Listening";
-  const dot = !connected
+  const dot = paused
+    ? "bg-zinc-400"
+    : !connected
     ? status === "error"
       ? "bg-red-500"
       : "bg-zinc-400"
@@ -452,6 +524,7 @@ function VoicePanelInner({
     <section
       className={`flex min-h-0 flex-col rounded-lg border border-zinc-200 bg-white text-sm text-zinc-900 ${className ?? ""}`}
       data-voice-status={status}
+      data-voice-paused={paused ? "true" : undefined}
     >
       <header className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
@@ -459,7 +532,7 @@ function VoicePanelInner({
           <div className="font-medium">{LABEL[mode]}</div>
           <div className="truncate text-xs text-zinc-500" aria-live="polite">
             {activity}
-            {gated && connected ? ` · transcript: ${scribe.status}` : ""}
+            {gated && connected && !paused ? ` · transcript: ${scribe.status}` : ""}
           </div>
         </div>
         {controls &&
@@ -475,6 +548,17 @@ function VoicePanelInner({
       </header>
 
       {error && <div className="border-b border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</div>}
+      {paused && (
+        <div role="status" className="border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+          Paused. The microphone is off: nothing is transcribed, stored or sent to the apprentice until you resume.
+        </div>
+      )}
+      {scribeDown && (
+        <div role="alert" className="border-b border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">
+          Live transcription is not running{scribeProblem || scribe.error ? ` (${scribeProblem || scribe.error})` : ""}. What you say
+          while you work is not recorded; only your answers to the apprentice&apos;s questions are. Stop and start to try again.
+        </div>
+      )}
 
       <div ref={scroller} className="min-h-24 flex-1 space-y-1.5 overflow-y-auto px-3 py-2">
         {lines.length === 0 && <p className="text-xs text-zinc-400">Nothing said yet.</p>}
@@ -492,7 +576,7 @@ function VoicePanelInner({
             </p>
           ),
         )}
-        {gated && scribe.partialTranscript && <p className="text-zinc-400">{scribe.partialTranscript}</p>}
+        {gated && !paused && scribe.partialTranscript && <p className="text-zinc-400">{scribe.partialTranscript}</p>}
       </div>
 
       {textOnly && (
@@ -508,10 +592,10 @@ function VoicePanelInner({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={connected ? "Type what you would say" : "Start the session first"}
-            disabled={!connected}
+            disabled={!connected || paused}
             className="min-w-0 flex-1 rounded border border-zinc-300 px-2 py-1 text-sm disabled:bg-zinc-100"
           />
-          <button type="submit" disabled={!connected} className="rounded bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-40">
+          <button type="submit" disabled={!connected || paused} className="rounded bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-40">
             Send
           </button>
         </form>

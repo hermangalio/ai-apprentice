@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Frame, Prediction, Scorecard, ScreenEvent, ScreenMoment, Session, WorkMap } from "@/lib/types";
+import type { ErpControlMessage } from "@/lib/erp/events";
+import { wantsModelCheck } from "@/lib/teach/check";
+import { createCueTracker, createOnce, isTypingPing, type TrackUpdate } from "@/lib/teach/cues";
 import type { CheckResponse, PredictionCue } from "@/lib/teach/engine";
 import type { Progress, ScoreItem } from "@/lib/teach/progress";
 import type { TeachIntervention } from "@/lib/teach/state";
@@ -12,7 +15,8 @@ import { ScorecardView } from "./ScorecardView";
 // The tutor side panel. It polls the learner session, checks every new event
 // against the Work Map and shows the intervention as text, so it works with
 // no voice connected. With voice, `onIntervention` hands the same instruction
-// to the voice agent.
+// to the voice agent. Each intervention is also sent to the ERP tab as a
+// coach message, so the learner sees it where they work.
 
 export type VoiceWiring = { sessionId: string; context: string; clientTools: TutorClientTools };
 
@@ -26,7 +30,17 @@ export type TeachPanelProps = {
   // Called once per new intervention or prediction question with the
   // instruction text for the voice agent (pass it to VoicePanel's speak()).
   onIntervention?: (instruction: string, cue: TutorCue) => void;
+  // Called when open interventions are settled: the learner corrected the
+  // value (guardrailIds), or the invoice was committed or left (all).
+  onSettled?: (guardrailIds: string[], all: boolean) => void;
+  // Called once per new learner screen event (typing pings left out), for
+  // the voice agent's "Screen:" lines.
+  onLearnerEvent?: (event: Pick<ScreenEvent, "kind" | "summary">) => void;
 };
+
+// What handleResult needs to know about the event a result belongs to.
+type EventMeta = { t: number; wall: number; kind?: string; committed?: boolean };
+type LearnerEvent = Partial<ScreenEvent> & { wallTime?: number };
 
 type PanelState = {
   session: Session;
@@ -42,6 +56,8 @@ const POLL_MS = 600;
 const REASON_DELAY_MS = 6000;
 const ERP_EVENTS = "erp-events";
 const ERP_CONTROL = "erp-control";
+// Stored events older than this are history: no "Screen:" line, no model call.
+const RECENT_MS = 15000;
 
 // Guardrail fact names to the field names the ERP can highlight.
 const HIGHLIGHT: Record<string, string> = {
@@ -54,7 +70,7 @@ const eur = (n?: number) => (n === undefined ? "" : `EUR ${n.toLocaleString("en-
 
 type ActiveCue = PredictionCue & { invoiceId?: string; t: number; answer: string; revealed: boolean };
 
-export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: TeachPanelProps) {
+export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSettled, onLearnerEvent }: TeachPanelProps) {
   const [full, setFull] = useState<FullState | null>(null);
   const [live, setLive] = useState<PanelState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,12 +85,25 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
   const fullRef = useRef<FullState | null>(null);
   const liveRef = useRef<PanelState | null>(null);
   const onInterventionRef = useRef(onIntervention);
+  const onSettledRef = useRef(onSettled);
+  const onLearnerEventRef = useRef(onLearnerEvent);
+  const tracker = useRef(createCueTracker());
+  // Guardrail of the coach message currently shown in the ERP tab.
+  const coachFor = useRef<string | null>(null);
+  const screenOnce = useRef(createOnce());
+  const modelOnce = useRef(createOnce());
+  // Guardrails the model raised an intervention for on the invoice on screen.
+  const modelRaised = useRef<{ invoiceId?: string; ids: Set<string> }>({ ids: new Set() });
   const control = useRef<BroadcastChannel | null>(null);
   const reasonTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     onInterventionRef.current = onIntervention;
-  }, [onIntervention]);
+    onSettledRef.current = onSettled;
+    onLearnerEventRef.current = onLearnerEvent;
+  }, [onIntervention, onSettled, onLearnerEvent]);
+
+  const postControl = useCallback((msg: ErpControlMessage) => control.current?.postMessage(msg), []);
 
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
@@ -103,37 +132,118 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
     return body as PanelState;
   }, [learnerSessionId]);
 
-  // Acts on one check result: speak, highlight, show the prediction question.
-  const handleResult = useCallback((res: CheckResponse, event: Pick<ScreenEvent, "t">) => {
-    for (const v of res.violations) {
-      if (v.repeat) continue;
-      onInterventionRef.current?.(v.instruction, { kind: "intervention", guardrailId: v.guardrailId, stepId: v.stepId });
-      if (v.field) control.current?.postMessage({ type: "highlight", field: HIGHLIGHT[v.field] ?? v.field });
-      setReplay(null);
-    }
-    if (res.prediction) {
-      if (!res.prediction.repeat) {
-        onInterventionRef.current?.(res.prediction.instruction, { kind: "prediction", stepId: res.prediction.stepId });
+  // Acts on one check result: speak, coach in the ERP tab, show the
+  // prediction question.
+  const handleResult = useCallback(
+    (res: CheckResponse, event: EventMeta): TrackUpdate => {
+      const track = tracker.current.update(res, event);
+      // A late answer about an earlier step (a slow model check, or the stored
+      // copy of a live event) must not undo what a newer step showed.
+      if (track.stale) return track;
+      if (track.all || track.settled.length) onSettledRef.current?.(track.settled, track.all);
+
+      let coached = false;
+      for (const v of res.violations) {
+        if (v.repeat) continue;
+        onInterventionRef.current?.(v.instruction, { kind: "intervention", guardrailId: v.guardrailId, stepId: v.stepId });
+        const field = v.field ? (HIGHLIGHT[v.field] ?? v.field) : undefined;
+        if (field) postControl({ type: "highlight", field });
+        // "broken" is already saved: nothing left to hold back in the ERP.
+        postControl({ type: "coach", text: v.question, field, severity: v.severity === "broken" ? "hint" : "stop" });
+        coachFor.current = v.guardrailId;
+        coached = true;
+        setReplay(null);
       }
-      const next = { ...res.prediction, invoiceId: res.invoiceId, t: event.t, answer: "", revealed: false };
-      // The stored copy of an event already checked live must not reset the card.
-      setCue((prev) => (prev && prev.invoiceId === next.invoiceId && prev.stepId === next.stepId ? prev : next));
-    }
-  }, []);
+      // The learner corrected the value, or committed or left the invoice.
+      if (!coached && coachFor.current && (track.all || track.settled.includes(coachFor.current))) {
+        postControl({ type: "coach_clear" });
+        coachFor.current = null;
+      }
+
+      if (res.prediction) {
+        if (!res.prediction.repeat) {
+          onInterventionRef.current?.(res.prediction.instruction, { kind: "prediction", stepId: res.prediction.stepId });
+        }
+        const next = { ...res.prediction, invoiceId: res.invoiceId, t: event.t, answer: "", revealed: false };
+        // The stored copy of an event already checked live must not reset the card.
+        setCue((prev) => (prev && prev.invoiceId === next.invoiceId && prev.stepId === next.stepId ? prev : next));
+      }
+      return track;
+    },
+    [postControl],
+  );
 
   const check = useCallback(
-    async (event: Partial<ScreenEvent> & { wallTime?: number }, opts: { persist?: boolean } = {}) => {
+    async (event: LearnerEvent, opts: { persist?: boolean; model?: boolean } = {}) => {
       const res = await fetch("/api/teach/check", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // The model is only needed for vision events; DOM events are decided by rule.
-        body: JSON.stringify({ learnerSessionId, event, persist: opts.persist === true, useModel: event.source === "vision" }),
+        // DOM events are decided by rule first, so the answer is immediate.
+        // The model is asked for vision events, and in a second call (see
+        // askModel) for guardrails the rules could not decide.
+        body: JSON.stringify({
+          learnerSessionId,
+          event,
+          persist: opts.persist === true,
+          useModel: opts.model === true || event.source === "vision",
+        }),
       });
       if (!res.ok) return null;
       return (await res.json()) as CheckResponse;
     },
     [learnerSessionId],
   );
+
+  // Second pass for guardrails without a usable `check`. Runs only at an
+  // invoice open or a confirmation step, never blocks the rule result, and
+  // adds its findings when they arrive. Rule violations of the same event
+  // come back marked as repeats, so nothing is said twice.
+  // One more case: a commit that closes an intervention the model raised.
+  // The rules cannot tell whether it was corrected or overridden, so the
+  // model is asked for the outcome.
+  const askModel = useCallback(
+    (event: LearnerEvent, first: CheckResponse, meta: EventMeta, track: TrackUpdate) => {
+      if (event.source === "vision" || first.skipped || track.stale || !first.undecided?.length) return;
+      if (!event.kind) return;
+      const raised = modelRaised.current;
+      const closesModelCue =
+        event.kind === "action" &&
+        event.committed === true &&
+        raised.invoiceId === first.invoiceId &&
+        first.undecided.some((id) => raised.ids.has(id));
+      if (closesModelCue) raised.ids.clear();
+      if (!closesModelCue && !wantsModelCheck({ ...event, kind: event.kind })) return;
+      if (Date.now() - meta.wall > RECENT_MS) return;
+      const key = `${first.invoiceId ?? ""}|${event.kind}|${event.action ?? ""}|${event.committed === true}`;
+      if (!modelOnce.current.first(key, meta.wall)) return;
+      void check(event, { model: true })
+        .then((res) => {
+          if (!res) return;
+          handleResult(res, meta);
+          if (!closesModelCue) {
+            if (raised.invoiceId !== res.invoiceId) {
+              raised.invoiceId = res.invoiceId;
+              raised.ids.clear();
+            }
+            for (const v of res.violations) if (first.undecided.includes(v.guardrailId)) raised.ids.add(v.guardrailId);
+          }
+          if (closesModelCue || res.violations.some((v) => !v.repeat) || (res.prediction && !res.prediction.repeat)) {
+            void refresh().catch(() => {});
+          }
+        })
+        .catch(() => {});
+    },
+    [check, handleResult, refresh],
+  );
+
+  // Passes a new learner step on for the voice agent's "Screen:" lines.
+  const noteLearnerEvent = useCallback((event: LearnerEvent, wall: number) => {
+    if (!event.kind || !event.summary || isTypingPing(event)) return;
+    if (Date.now() - wall > RECENT_MS) return;
+    const invoice = event.facts?.invoice_id ?? event.entity?.id ?? "";
+    if (!screenOnce.current.first(`${invoice}|${event.kind}|${event.summary}`, wall)) return;
+    onLearnerEventRef.current?.({ kind: event.kind, summary: event.summary });
+  }, []);
 
   // Poll the session and check events that have not been checked yet.
   useEffect(() => {
@@ -143,15 +253,18 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
       busy.current = true;
       try {
         const state = await refresh();
+        const startedAt = Date.parse(state.session.startedAt);
         let acted = false;
         for (const e of state.events) {
           if (stopped) break;
           if (checked.current.has(e.id)) continue;
           checked.current.add(e.id);
+          const meta = { t: e.t, wall: startedAt + e.t, kind: e.kind, committed: e.committed };
+          noteLearnerEvent(e, meta.wall);
           if (e.kind === "other" && !e.action) continue;
           const res = await check(e);
           if (res) {
-            handleResult(res, e);
+            askModel(e, res, meta, handleResult(res, meta));
             acted = acted || res.violations.length > 0 || e.committed === true;
           }
         }
@@ -168,7 +281,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
       stopped = true;
       clearInterval(timer);
     };
-  }, [refresh, check, handleResult]);
+  }, [refresh, check, handleResult, askModel, noteLearnerEvent]);
 
   // Fast path: ERP events arrive here over the BroadcastChannel before they
   // reach the server. Check them at once. If no other tab stores the event
@@ -179,15 +292,17 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
     ch.onmessage = (msg: MessageEvent) => {
       const data = msg.data as (Partial<ScreenEvent> & { wallTime?: number }) | null;
       if (!data || typeof data !== "object" || !data.kind) return;
-      if (data.kind === "other" && !data.action) return;
       const wallTime = typeof data.wallTime === "number" ? data.wallTime : Date.now();
+      noteLearnerEvent(data, wallTime);
+      if (data.kind === "other" && !data.action) return;
       const id = `live_${Math.round(wallTime)}`;
       const event = { ...data, id, wallTime, source: "dom" as const };
       checked.current.add(id);
       const startedAt = liveRef.current ? Date.parse(liveRef.current.session.startedAt) : wallTime;
       void check(event).then((res) => {
         if (!res) return;
-        handleResult(res, { t: Math.max(0, wallTime - startedAt) });
+        const meta = { t: Math.max(0, wallTime - startedAt), wall: wallTime, kind: data.kind, committed: data.committed };
+        askModel(event, res, meta, handleResult(res, meta));
         if (res.violations.length) void refresh().catch(() => {});
       });
       setTimeout(() => {
@@ -199,6 +314,8 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
             (e.field ?? "") === (data.field ?? "") &&
             (e.after ?? "") === (data.after ?? "") &&
             (e.action ?? "") === (data.action ?? "") &&
+            // The request and the confirmation of an action differ only here.
+            (e.committed === true) === (data.committed === true) &&
             (e.facts?.invoice_id ?? e.entity?.id ?? "") === (data.facts?.invoice_id ?? data.entity?.id ?? "") &&
             Math.abs(e.t - t) < 4000,
         );
@@ -206,7 +323,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention }: Teac
       }, 3000);
     };
     return () => ch.close();
-  }, [check, handleResult, refresh]);
+  }, [check, handleResult, askModel, noteLearnerEvent, refresh]);
 
   const clientTools = useMemo(
     () =>

@@ -47,6 +47,10 @@ export type CheckResponse = {
   violations: CheckedViolation[];
   atRisk: { id: string; stepId: string; rule: string }[];
   prediction?: PredictionCue;
+  // Ids of guardrails this response could not decide: no usable `check` and
+  // the model was not asked (or did not answer). The caller may ask again
+  // with useModel true; violations already issued come back as repeats.
+  undecided: string[];
   decidedBy: "rule" | "model";
   skipped?: string;
   ms: number;
@@ -81,7 +85,9 @@ export async function runCheck(
   const result = checkEvent(workMap, event, history);
   let violations: Violation[] = result.violations;
   let atRisk: Guardrail[] = result.atRisk;
+  let satisfied: Guardrail[] = result.satisfied;
   let decidedBy: "rule" | "model" = "rule";
+  let undecided: Guardrail[] = result.skipped ? [] : result.undecided;
 
   // Typing pings and queue views carry nothing to judge.
   const worthAsking = event.kind !== "other" || Boolean(event.action);
@@ -91,6 +97,8 @@ export async function runCheck(
       if (extra.violations.length || extra.atRisk.length) decidedBy = "model";
       violations = [...violations, ...extra.violations];
       atRisk = [...atRisk, ...extra.atRisk];
+      satisfied = [...satisfied, ...extra.satisfied];
+      undecided = [];
     } catch {
       // The model is a fallback; without it the deterministic result stands.
     }
@@ -150,7 +158,7 @@ export async function runCheck(
     // A committed action settles earlier interventions on this invoice.
     if (closing && invoiceId) {
       const broken = new Set(violations.map((v) => v.guardrail.id));
-      const ok = new Set(result.satisfied.map((g) => g.id));
+      const ok = new Set(satisfied.map((g) => g.id));
       for (const i of state.interventions) {
         if (i.invoiceId !== invoiceId || i.outcome) continue;
         if (broken.has(i.guardrailId)) i.outcome = "overridden";
@@ -190,6 +198,7 @@ export async function runCheck(
     violations: out.checked,
     atRisk: atRisk.map((g) => ({ id: g.id, stepId: g.stepId, rule: g.rule })),
     prediction: out.prediction,
+    undecided: undecided.map((g) => g.id),
     decidedBy,
     skipped: result.skipped,
     ms: Math.round((performance.now() - started) * 10) / 10,

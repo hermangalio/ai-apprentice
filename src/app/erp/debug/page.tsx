@@ -53,6 +53,20 @@ export default function ErpDebugPage() {
         <button type="button" className="rounded bg-slate-900 px-3 py-1 text-white" onClick={() => send({ type: "open_invoice", id: invoiceId })}>
           Send
         </button>
+        <span className="ml-4 font-semibold">Coach:</span>
+        <button
+          type="button"
+          className="rounded border border-slate-900 px-2 py-1 text-sm"
+          onClick={() => send({ type: "coach", text: "Sabine would stop here. Why do you think?", field: "cost_center", severity: "stop" })}
+        >
+          stop
+        </button>
+        <button type="button" className="rounded border border-slate-900 px-2 py-1 text-sm" onClick={() => send({ type: "coach", text: "Check the supplier history.", severity: "hint" })}>
+          hint
+        </button>
+        <button type="button" className="rounded border border-slate-900 px-2 py-1 text-sm" onClick={() => send({ type: "coach_clear" })}>
+          clear
+        </button>
         <label className="ml-4 flex items-center gap-2">
           <input type="checkbox" checked={showTyping} onChange={(e) => setShowTyping(e.target.checked)} />
           Show typing pings

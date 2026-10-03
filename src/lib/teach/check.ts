@@ -272,6 +272,15 @@ export function mergedFacts(event: ScreenEvent, history: ScreenEvent[]): CaseFac
   return { ...facts, ...(event.facts ?? {}) };
 }
 
+// Whether guardrails the rules left undecided are worth a model call for this
+// event. Only the two moments where a late answer is still useful: an invoice
+// was just opened, or an action waits in the confirmation step. Field changes
+// and committed actions are left to the rules.
+export function wantsModelCheck(e: Pick<ScreenEvent, "kind" | "action" | "committed" | "entity" | "facts">): boolean {
+  if (e.kind === "open") return Boolean(e.facts?.invoice_id ?? (e.entity?.type === "invoice" ? e.entity.id : undefined));
+  return e.kind === "action" && Boolean(e.action) && e.committed !== true;
+}
+
 const eur = (n: number) => `EUR ${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
 export function describeCase(f: CaseFacts): string {
