@@ -111,10 +111,12 @@ export function useScreenCapture({ sessionId }: { sessionId: string | null | und
     };
   }, [sessionId, addEvents]);
 
-  // DOM events from the sandbox ERP. Every message counts as activity; real
-  // events are forwarded to the server, typing pings are not stored.
+  // DOM events from the sandbox ERP, only while the screen is shared: nothing
+  // is logged before the person has started sharing or after they stopped.
+  // Every message counts as activity; real events are forwarded to the
+  // server, typing pings are not stored.
   useEffect(() => {
-    if (!sessionId || typeof BroadcastChannel === "undefined") return;
+    if (!sessionId || status !== "sharing" || typeof BroadcastChannel === "undefined") return;
     const channel = new BroadcastChannel(ERP_CHANNEL);
     channel.onmessage = (msg: MessageEvent) => {
       setLastActivityAt(Date.now());
@@ -133,7 +135,7 @@ export function useScreenCapture({ sessionId }: { sessionId: string | null | und
         .catch(() => {});
     };
     return () => channel.close();
-  }, [sessionId, addEvents]);
+  }, [sessionId, status, addEvents]);
 
   const upload = useCallback(
     async (video: HTMLVideoElement) => {

@@ -25,7 +25,7 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
   };
 
   const label = recording
-    ? "Recording"
+    ? "Recording and listening"
     : paused
       ? "Paused, nothing is sent"
       : status === "requesting"
@@ -69,10 +69,11 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
             disabled={status === "requesting"}
             className="rounded bg-zinc-900 px-3 py-1 text-white hover:bg-zinc-700 disabled:opacity-50"
           >
-            Share screen
+            Share screen and start
           </button>
         )}
 
+        {sharing && (
         <button
           type="button"
           onClick={() => {
@@ -84,7 +85,9 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
         >
           {paused ? "Resume" : "Pause"}
         </button>
+        )}
 
+        {sharing && (
         <button
           type="button"
           onClick={() => void offRecord()}
@@ -94,6 +97,7 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
         >
           Off the record
         </button>
+        )}
       </div>
       {notice && <p className="text-amber-800">{notice}</p>}
       {error && status === "error" && <p className="text-red-700">{error}</p>}

@@ -15,8 +15,8 @@ A **Stop** means: hands off the mouse and keyboard, say nothing, count to four. 
 | # | Do | Say |
 |---|---|---|
 | 1 | Click **Capture**, enter your name, click **Start session** | |
-| 2 | Click **Open the sandbox ERP** (new tab). Go back, click **Share screen**, pick the ERP tab | |
-| 3 | Press **Start** on the Apprentice panel, then switch to the ERP tab | "Okay, month-end close, three invoices to get through." |
+| 2 | Click **Open the sandbox ERP** (new tab). Go back, click **Share screen and start**, pick the ERP tab. This also connects the apprentice; allow the microphone if asked | |
+| 3 | Wait until the panel shows the apprentice as connected, then switch to the ERP tab | "Okay, month-end close, three invoices to get through." |
 | 4 | Open invoice 4471 | "First one. Kessler, tool holders, six thousand eight hundred forty." |
 | 5 | Open the purchase order panel | "I check it against the purchase order first. Amounts match, goods are received." |
 | 6 | Change cost center to 0400 | "This one goes to capex." |

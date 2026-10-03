@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CaptureControls } from "@/components/capture/CaptureControls";
 import { EventFeed } from "@/components/capture/EventFeed";
@@ -35,7 +35,7 @@ export default function CapturePage() {
     <main className="mx-auto flex max-w-xl flex-col gap-5 p-8 text-stone-900">
       <h1 className="text-2xl font-semibold">Show the apprentice how you work</h1>
       <p className="text-stone-600">
-        Share your screen and do a real task. The apprentice stays quiet while you work and asks a short question when you pause.
+        Share your screen and do a real task. Sharing starts everything: the apprentice watches, listens, stays quiet while you work and asks a short question when you pause.
       </p>
       <label className="flex flex-col gap-1 text-sm">
         Your name
@@ -59,7 +59,7 @@ export default function CapturePage() {
 }
 
 const PHASE_LABEL: Record<string, string> = {
-  off: "Not listening yet",
+  off: "Not started. Share your screen to begin.",
   watching: "Watching quietly",
   choosing: "Pause noticed, choosing a question",
   asking: "Asking",
@@ -82,6 +82,14 @@ function CaptureSession({ session }: { session: Session }) {
     // screen is shared or after sharing has stopped.
     enabled: capture.status === "sharing" && !capture.paused && !finishing,
   });
+
+  // One control for everything: sharing the screen also connects the
+  // apprentice (microphone and voice), and stopping the share disconnects it.
+  const sharing = capture.status === "sharing";
+  useEffect(() => {
+    if (sharing) void voice.current?.start();
+    else voice.current?.stop();
+  }, [sharing]);
 
   const finish = async () => {
     setError(null);
@@ -126,6 +134,7 @@ function CaptureSession({ session }: { session: Session }) {
           personName={session.personName}
           task={session.task}
           paused={capture.paused}
+          controls={false}
         />
       </section>
 
