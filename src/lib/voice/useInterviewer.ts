@@ -14,8 +14,11 @@ import { getVoice, onVoiceRegistryChange, type VoicePanelHandle } from "./regist
 // - sends new screen events to the agent as contextual updates,
 // - watches for a pause (pause.ts),
 // - asks the server for the single best question (POST questions/next),
-// - has the agent ask it and opens the microphone for the answer,
-// - marks the question asked, then answered once the expert has gone quiet.
+// - instructs the agent to ask it (the panel opens the microphone for the
+//   answer once the agent has finished speaking),
+// - marks the question asked when the agent's utterance has arrived, and
+//   answered once the expert has replied and gone quiet. A question the
+//   agent never spoke stays queued.
 //
 // The hook finds the <VoicePanel> mounted with the same sessionId by itself.
 // Pass `voice` to use a specific panel ref instead.
@@ -51,6 +54,16 @@ const TICK_MS = 400;
 const REFETCH_MS = 8000;
 // A chosen question may wait this long for a pause before it is chosen again.
 const FRESH_MS = 20_000;
+// The analysis behind a question takes a few seconds. A question chosen
+// before the latest event or remark is still used when a pause opens, if it
+// is at most this old. Otherwise short pauses would pass while every new
+// event or sentence restarts the analysis.
+const STALE_OK_MS = 10_000;
+// The agent's utterance has to arrive this soon after the instruction.
+// Otherwise the question was not spoken and goes back to the queue.
+const AGENT_REPLY_TIMEOUT_MS = 8000;
+// After a question that was not spoken, wait this long before the next try.
+const RETRY_AFTER_SILENT_MS = 10_000;
 // An answer that starts after the question window closed still counts if it
 // comes within this time of the question.
 const LATE_ANSWER_MS = 60_000;
@@ -80,12 +93,24 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
     startedAt: 0, // set on mount
     sent: new Set<string>(),
     lastEventAt: null as number | null,
+    // When a committed action (post, hold, send for approval) was last seen.
+    lastCommitAt: null as number | null,
     version: 0, // bumps when events or speech change what could be asked
     fetched: null as Fetched | null,
     fetching: false,
     lastFetchAt: 0,
     questionTimes: [] as number[],
-    asking: null as { question: Question; askedAt: number; answerIds: string[]; lastUserSpeechAt: number | null } | null,
+    // The question that is out. instructedAt: the agent was told to ask it.
+    // spokenAt: the agent's utterance arrived; null until then.
+    asking: null as {
+      question: Question;
+      instructedAt: number;
+      spokenAt: number | null;
+      answerIds: string[];
+      lastUserSpeechAt: number | null;
+    } | null,
+    // When the agent last failed to speak a question it was given.
+    silentAt: null as number | null,
     // The last question that timed out without an answer. An answer that
     // comes late (the expert finished a thought first) is still linked to it.
     unanswered: null as { question: Question; askedAt: number } | null,
@@ -145,13 +170,28 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
   useEffect(() => {
     if (!voice) return;
     return voice.subscribe((event) => {
-      if (event.type !== "utterance" || event.speaker === "agent") return;
+      if (event.type !== "utterance") return;
       const r = run.current;
+      if (event.speaker === "agent") {
+        // The agent's utterance after the instruction is the question. Only
+        // now is it stored as asked and counted against the live budget.
+        if (r.asking && r.asking.spokenAt === null) {
+          const { question } = r.asking;
+          r.asking.spokenAt = event.endedAt;
+          r.questionTimes.push(event.endedAt);
+          void patchQuestion(question.id, { status: "asked", askedIn: "capture" });
+          setState((prev) => ({ ...prev, asked: [...prev.asked, question] }));
+        }
+        return;
+      }
       r.version++;
-      if (r.asking && event.at >= r.asking.askedAt) {
-        r.asking.lastUserSpeechAt = event.at;
-        if (event.transcriptId) r.asking.answerIds.push(event.transcriptId);
-      } else if (r.unanswered && event.at - r.unanswered.askedAt < LATE_ANSWER_MS) {
+      if (r.asking) {
+        // Speech that ended after the question was spoken is the answer.
+        if (r.asking.spokenAt !== null && event.endedAt >= r.asking.spokenAt) {
+          r.asking.lastUserSpeechAt = event.endedAt;
+          if (event.transcriptId) r.asking.answerIds.push(event.transcriptId);
+        }
+      } else if (r.unanswered && event.endedAt - r.unanswered.askedAt < LATE_ANSWER_MS) {
         void patchQuestion(r.unanswered.question.id, {
           status: "answered",
           answerTranscriptIds: event.transcriptId ? [event.transcriptId] : [],
@@ -168,8 +208,9 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
       const v = voiceRef.current;
       if (!enabled) {
         // Paused or off the record: stop listening at once and give up the
-        // question that was out. It keeps its stored status ("asked", so the
-        // debrief picks it up) unless the off-the-record purge removes it.
+        // question that was out. It keeps its stored status ("asked" if the
+        // agent had spoken it, so the debrief picks it up) unless the
+        // off-the-record purge removes it.
         // A question chosen earlier is not reused: it may be about moments
         // that have just been purged.
         if (!r.shut) {
@@ -200,18 +241,35 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
         v.sendContext(screenUpdate(e));
         r.sent.add(e.id);
         added = true;
+        // A vision event describes a frame whose change already counted as
+        // screen activity when it was captured, seconds ago. A DOM event is
+        // reported as it happens.
+        if (e.source === "dom") r.lastEventAt = now;
+        if (e.kind === "action" && e.committed === true) r.lastCommitAt = now;
       }
-      if (added) {
-        r.lastEventAt = now;
-        r.version++;
-      }
+      if (added) r.version++;
 
-      // A question is out: wait for the answer, then close the microphone.
+      // A question is out: wait for the agent to say it, then for the
+      // answer, then close the microphone.
       if (r.asking) {
+        if (r.asking.spokenAt === null) {
+          if (now - r.asking.instructedAt > AGENT_REPLY_TIMEOUT_MS) {
+            // Nothing was said. The question keeps its stored status "queued".
+            r.asking = null;
+            r.silentAt = now;
+            v.closeMic();
+            r.version++;
+            patch({ phase: "watching", current: null, lastReason: "The apprentice did not speak the question. It stays queued." });
+          } else {
+            patch({ phase: "asking" });
+          }
+          return;
+        }
+        const askedAt = r.asking.spokenAt;
         const lastUserSpeechAt = Math.max(vs.lastUserSpeechAt ?? 0, r.asking.lastUserSpeechAt ?? 0) || null;
         const answer = evaluateAnswer({
           now,
-          askedAt: r.asking.askedAt,
+          askedAt,
           lastUserSpeechAt,
           agentSpeaking: vs.agentSpeaking,
           lastAgentSpeechAt: vs.lastAgentSpeechAt,
@@ -220,7 +278,7 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
           const done = r.asking;
           r.asking = null;
           v.closeMic();
-          r.unanswered = answer === "unanswered" ? { question: done.question, askedAt: done.askedAt } : null;
+          r.unanswered = answer === "unanswered" ? { question: done.question, askedAt } : null;
           if (answer === "answered") {
             // Transcript ids can arrive a moment after the speech ended.
             setTimeout(() => patchQuestion(done.question.id, { status: "answered", answerTranscriptIds: done.answerIds }), 1500);
@@ -239,6 +297,7 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
         sessionStartedAt: r.startedAt,
         lastScreenActivityAt,
         lastTypingAt: o.lastTypingAt,
+        lastCommitAt: r.lastCommitAt,
         lastUserSpeechAt: vs.lastUserSpeechAt,
         agentSpeaking: vs.agentSpeaking,
         lastAgentSpeechAt: vs.lastAgentSpeechAt,
@@ -247,16 +306,23 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
 
       // A fetched question is only good for the state it was chosen for, and
       // only for a short time: it has to be about what is on screen now.
+      const upToDate = !!r.fetched && r.fetched.version === r.version;
       const usable =
-        r.fetched && r.fetched.version === r.version && !(r.fetched.question && now - r.fetched.at > FRESH_MS);
+        r.fetched &&
+        (upToDate
+          ? !(r.fetched.question && now - r.fetched.at > FRESH_MS)
+          : // Chosen before the latest change: good for a short while.
+            !!r.fetched.question && now - r.fetched.at <= STALE_OK_MS);
       const current = usable ? r.fetched : null;
       // Keep the server's analysis warm: ask as soon as something changed,
       // without waiting for the pause.
-      const stale = !current && now - r.lastFetchAt > 1000;
+      const stale = !upToDate && now - r.lastFetchAt > 1000;
       const retry = current && !current.question && now - current.at > REFETCH_MS && decision.open;
       if (!r.fetching && (stale || retry) && r.sent.size > 0) void fetchNext();
 
-      const open = decision.open || r.force;
+      // The agent stayed silent on the last try: do not try again at once.
+      const backoff = r.silentAt !== null && now - r.silentAt < RETRY_AFTER_SILENT_MS;
+      const open = (decision.open && !backoff) || r.force;
       if (!open) {
         patch({ phase: "watching", blockedBy: decision.blockedBy, lastReason: current?.reason ?? null });
         return;
@@ -267,17 +333,21 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
         return;
       }
 
-      // Ask it.
+      // Ask it. The question is stored as asked when the agent's utterance
+      // arrives (see the subscription above), not here.
       const question = current.question;
       r.force = false;
       r.fetched = null;
-      r.questionTimes.push(now);
-      r.asking = { question, askedAt: now, answerIds: [], lastUserSpeechAt: null };
+      if (!v.speak(askInstruction(question.text))) {
+        // Not sent: the connection went away or the panel is paused.
+        r.silentAt = now;
+        patch({ phase: "watching", blockedBy: [], lastReason: "The question could not be sent to the apprentice." });
+        return;
+      }
+      r.asking = { question, instructedAt: now, spokenAt: null, answerIds: [], lastUserSpeechAt: null };
       r.unanswered = null;
       r.version++;
-      v.speak(askInstruction(question.text));
-      void patchQuestion(question.id, { status: "asked", askedIn: "capture" });
-      setState((prev) => ({ ...prev, phase: "asking", blockedBy: [], current: question, asked: [...prev.asked, question] }));
+      setState((prev) => ({ ...prev, phase: "asking", blockedBy: [], current: question }));
     };
     const timer = setInterval(tick, TICK_MS);
     return () => clearInterval(timer);

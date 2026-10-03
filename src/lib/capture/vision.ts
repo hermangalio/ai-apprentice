@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { WarmSession, type LLMImage } from "@/lib/llm";
 import * as store from "@/lib/store";
+import { dedupeVisionEvents } from "./dedupe";
 import { redact } from "./redact";
 import type { CaseFacts, Frame, ScreenEvent, ScreenEventKind } from "@/lib/types";
 
@@ -306,7 +307,14 @@ async function processFrameNow(sessionId: string, st: State, jpeg: Buffer, t: nu
 
   const body = Array.isArray(parsed) ? { events: parsed, facts: {} } : (parsed ?? {});
   const facts = mergeFacts(st, cleanFacts(body.facts));
-  const events: ScreenEvent[] = cleanEvents(body.events).map((e) => ({
+  // The prompt asks the model not to repeat recorded events; it does anyway.
+  // Repeats of stored events are removed here, and where the DOM channel
+  // reports on the entity on screen, the DOM events stay the record.
+  const { kept, dropped } = dedupeVisionEvents(cleanEvents(body.events), await store.events.all(sessionId), t);
+  if (dropped.length) {
+    console.log(`[capture] ${dropped.length} vision event(s) not stored at ${clock(t)}: ${dropped.map((d) => `${d.event.summary} (${d.reason})`).join("; ")}`);
+  }
+  const events: ScreenEvent[] = kept.map((e) => ({
     ...e,
     id: store.newId("evt"),
     t,

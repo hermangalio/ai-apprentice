@@ -78,7 +78,9 @@ function CaptureSession({ session }: { session: Session }) {
     lastActivityAt: capture.lastActivityAt || null,
     events: capture.events,
     voice,
-    enabled: !capture.paused && !finishing,
+    // Questions are about what is on screen, so none are asked before the
+    // screen is shared or after sharing has stopped.
+    enabled: capture.status === "sharing" && !capture.paused && !finishing,
   });
 
   const finish = async () => {

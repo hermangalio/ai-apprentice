@@ -24,6 +24,23 @@ Write a check for every guardrail whose condition can be expressed this way, inc
 
 const JUDGMENT_GAP_PREFIX = "This looked like a judgment call";
 
+// The debrief is short: this many gaps at most, the most valuable first.
+export const MAX_DEBRIEF_GAPS = 5;
+
+type GapKind = "reason" | "guardrail" | "exception" | "other";
+
+// What a gap question asks for, when its source did not say.
+export function gapKind(question: string): GapKind {
+  if (/\b(limit|threshold|amount|always|every|rule|who (decides|releases|approves|signs)|ask (someone|first)|stop and ask|how (much|long)|until when|above|below|when (does|do|would|is|exactly))\b/i.test(question)) {
+    return "guardrail";
+  }
+  if (/\b(never seen|not seen|did not occur|different from|unknown|new supplier|what (do|would) you do (when|with|if))\b/i.test(question)) return "exception";
+  if (/\b(why|what made you|reason|how come)\b/i.test(question)) return "reason";
+  return "other";
+}
+
+const GAP_VALUE: Record<GapKind, number> = { guardrail: 4, reason: 3, exception: 2, other: 1 };
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 function eventLine(e: ScreenEvent) {
@@ -73,7 +90,7 @@ type RawGuardrail = {
   momentEventId?: string;
   momentLabel?: string;
 };
-type RawGap = { question?: string; why?: string; stepIndex?: number | null; questionId?: string | null };
+type RawGap = { question?: string; why?: string; kind?: string; stepIndex?: number | null; questionId?: string | null };
 type RawDraft = { steps?: RawStep[]; guardrails?: RawGuardrail[]; gaps?: RawGap[] };
 
 const DRAFT_SYSTEM = `You are an apprentice who watched an expert do a task on screen and listened to them talk. You now write the first draft of a Work Map: the process as ordered steps, the decisions, the reasons in the expert's own words, the guardrails, and the things you still do not understand.
@@ -105,7 +122,7 @@ Return one JSON object:
     }
   ],
   "gaps": [
-    { "question": "...", "why": "what is unclear and why it matters", "stepIndex": 1-based index or null, "questionId": "id of a queued question this covers" or null }
+    { "question": "...", "why": "what is unclear and why it matters", "kind": "reason" | "guardrail" | "exception", "stepIndex": 1-based index or null, "questionId": "id of a queued question this covers" or null }
   ]
 }
 
@@ -125,8 +142,10 @@ ${CHECK_GUIDE}
 
 Gaps:
 - Gaps are follow-up questions for the spoken debrief. Only things NOT already answered in the transcript.
-- Give at least three and at most six. Cover these kinds where they apply: an exception you noticed whose scope is unclear (does it hold for every case or only this one?); a rule whose limits or decision-maker nobody named (how much, until when, who decides or releases); a reason that was stated as a fact about one case but not as a rule; and a case that did not occur in this session but will come up, for example a supplier the expert has never seen before.
-- Each queued question you are given must appear as a gap with its questionId, unless the transcript already answers it.
+- Give at least three and at most five, the most valuable first: a missing limit or decision-maker is worth more than a missing reason, and both are worth more than a general question. "kind" is "reason" (why they did it), "guardrail" (the limit, the rule, who decides) or "exception" (a case that was not seen).
+- One gap per thing that is unclear. Never two gaps of the same kind about the same action on the same case. Several queued questions about one action are one gap; give the questionId of the best one.
+- Cover these kinds where they apply: an exception you noticed whose scope is unclear (does it hold for every case or only this one?); a rule whose limits or decision-maker nobody named (how much, until when, who decides or releases); a reason that was stated as a fact about one case but not as a rule; and a case that did not occur in this session but will come up, for example a supplier the expert has never seen before.
+- A queued question that the transcript does not answer should be covered by a gap, unless another gap already asks the same thing.
 - "question" is what the apprentice will say out loud to the expert: second person, one or two short sentences, concrete about what was on screen. "why" is one sentence for the reader of the map.`;
 
 export async function buildDraftWorkMap(sessionId: string): Promise<WorkMap> {
@@ -184,13 +203,36 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
   const eventIds = new Set(events.map((e) => e.id));
   const name = session.personName;
 
-  const gaps: Omit<Gap, "id">[] = [];
+  // Gaps are collected with what they are about, so that two questions of
+  // the same kind about the same step and case count as one.
+  type Draft = Omit<Gap, "id"> & { kind: GapKind; subject: string; order: number };
+  const collected: Draft[] = [];
   const seenGap = new Set<string>();
-  const addGap = (g: Omit<Gap, "id">) => {
-    const key = normQ(g.question);
-    if (!key || seenGap.has(key)) return;
-    seenGap.add(key);
-    gaps.push(g);
+  const eventById = new Map(events.map((e) => [e.id, e]));
+  const entityIds = [...new Set(events.map((e) => e.entity?.id).filter((x): x is string => !!x))];
+  // The cases a gap is about: the ones its events belong to, else the ones
+  // named in the question, else the ones of its step if the step has only one.
+  const subjectOf = (question: string, stepId: string | undefined, ids: string[]) => {
+    let cases = [...new Set(ids.map((id) => eventById.get(id)?.entity?.id).filter((x): x is string => !!x))];
+    if (cases.length === 0) cases = entityIds.filter((id) => new RegExp(`(^|[^\\w])${id.replace(/[^\w-]/g, "")}([^\\w]|$)`).test(question));
+    if (cases.length === 0 && stepId) {
+      const step = steps.find((x) => x.id === stepId);
+      const ofStep = [...new Set((step?.eventIds ?? []).map((id) => eventById.get(id)?.entity?.id).filter((x): x is string => !!x))];
+      if (ofStep.length === 1) cases = ofStep;
+    }
+    if (cases.length === 0 && !stepId) return "";
+    return `${stepId ?? ""}|${cases.sort().join(",")}`;
+  };
+  const addGap = (g: Omit<Gap, "id">, about: { kind?: GapKind; eventIds?: string[] } = {}) => {
+    const text = normQ(g.question);
+    if (!text || seenGap.has(text)) return false;
+    const kind = about.kind ?? gapKind(g.question);
+    const subject = subjectOf(g.question, g.stepId, about.eventIds ?? []);
+    // Same kind of question about the same step and case: the first one stays.
+    if (subject && kind !== "other" && collected.some((c) => c.kind === kind && c.subject === subject)) return false;
+    seenGap.add(text);
+    collected.push({ ...g, kind, subject, order: collected.length });
+    return true;
   };
 
   // Steps. `rawIndex -> step` so guardrails and gaps can refer to model indices.
@@ -282,23 +324,31 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
     if (!question) continue;
     const step = stepByRawIndex.get(Number(rg.stepIndex));
     if (rg.questionId) coveredQuestions.add(rg.questionId);
-    addGap({
-      question,
-      why: str(rg.why) || "Not answered during the task.",
-      ...(step ? { stepId: step.id } : {}),
-      status: "open",
-    });
+    const covered = pending.find((q) => q.id === rg.questionId);
+    const kind = (["reason", "guardrail", "exception"] as const).find((k) => k === rg.kind) ?? covered?.kind;
+    addGap(
+      {
+        question,
+        why: str(rg.why) || "Not answered during the task.",
+        ...(step ? { stepId: step.id } : {}),
+        status: "open",
+      },
+      { kind, eventIds: covered?.eventIds },
+    );
   }
-  demoted.forEach(addGap);
+  for (const g of demoted) addGap(g, g.why.startsWith(JUDGMENT_GAP_PREFIX) ? { kind: "reason" } : {});
   for (const q of pending) {
     if (coveredQuestions.has(q.id)) continue;
     const step = steps.find((s) => q.eventIds.some((id) => s.eventIds.includes(id)));
-    addGap({
-      question: q.text,
-      why: "Queued during the task and not answered before it ended.",
-      ...(step ? { stepId: step.id } : {}),
-      status: "open",
-    });
+    addGap(
+      {
+        question: q.text,
+        why: "Queued during the task and not answered before it ended.",
+        ...(step ? { stepId: step.id } : {}),
+        status: "open",
+      },
+      { kind: q.kind, eventIds: q.eventIds },
+    );
   }
   const fallbacks: Omit<Gap, "id">[] = [
     {
@@ -318,9 +368,21 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
     },
   ];
   for (const f of fallbacks) {
-    if (gaps.length >= 3) break;
+    if (collected.length >= 3) break;
     addGap(f);
   }
+  // Most valuable first: a missing limit or decision-maker, then a missing
+  // reason, then cases that were not seen. Within one kind the order in
+  // which they were found stays. The debrief asks the first few only.
+  const gaps: Omit<Gap, "id">[] = [...collected]
+    .sort((a, b) => GAP_VALUE[b.kind] - GAP_VALUE[a.kind] || a.order - b.order)
+    .slice(0, MAX_DEBRIEF_GAPS)
+    .map((c) => ({
+      question: c.question,
+      why: c.why,
+      ...(c.stepId ? { stepId: c.stepId } : {}),
+      status: c.status,
+    }));
 
   return {
     sessionId: session.id,

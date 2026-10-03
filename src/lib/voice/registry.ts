@@ -22,9 +22,10 @@ export type VoiceState = {
 };
 
 export type VoiceEvent =
-  // A final utterance from either side. transcriptId is set once the
+  // A final utterance from either side. `at` is Date.now() when the speech
+  // started, `endedAt` when it was complete. transcriptId is set once the
   // transcript route has stored it.
-  | { type: "utterance"; speaker: Speaker; text: string; at: number; transcriptId?: string }
+  | { type: "utterance"; speaker: Speaker; text: string; at: number; endedAt: number; transcriptId?: string }
   | { type: "state"; state: VoiceState };
 
 export type VoicePanelHandle = {
@@ -33,9 +34,12 @@ export type VoicePanelHandle = {
   // Adds context without making the agent speak.
   sendContext(text: string): void;
   // Makes the agent say something now. The text is an instruction to the
-  // agent, for example askInstruction(question) or "Guardrail: ...". With the
-  // gated policy this also opens the microphone for the answer.
-  speak(instruction: string): void;
+  // agent, for example askInstruction(question) or "Guardrail: ...". Returns
+  // false when nothing was sent (not connected, paused, or the send failed).
+  // With the gated policy the agent becomes audible at once, and the
+  // microphone opens for the answer only after the agent has finished
+  // speaking, so speech in the room cannot cut the agent off before it starts.
+  speak(instruction: string): boolean;
   // Sends text as if the person had said it (text-only testing).
   sendText(text: string): void;
   // Gated policy only: let the agent hear the microphone, or stop it.

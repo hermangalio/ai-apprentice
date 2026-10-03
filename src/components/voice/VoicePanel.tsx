@@ -60,6 +60,18 @@ export type VoicePanelProps = {
 
 type Line = { id: number; who: "agent" | "person" | "note"; text: string; muted?: boolean };
 
+// Scribe commits an utterance after this much silence. The default of the
+// service is longer; a short value gives sentence-sized transcript items
+// instead of one item per monologue. Allowed range: 0.3 to 3.0 seconds.
+const SCRIBE_SILENCE_SECS = 0.5;
+// A partial transcript arrives roughly this long after the speech started.
+const PARTIAL_LAG_MS = 300;
+// Gated policy: if the agent's end of speech is not reported, the microphone
+// opens this long after the agent's text arrived, plus the time it takes to
+// say the text.
+const MIC_OPEN_FALLBACK_MS = 1500;
+const MS_PER_SPOKEN_WORD = 400;
+
 const LABEL: Record<VoiceMode, string> = { interviewer: "Apprentice", debrief: "Debrief", tutor: "Tutor" };
 
 export function VoicePanel(props: VoicePanelProps) {
@@ -96,7 +108,11 @@ function VoicePanelInner({
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [error, setError] = useState<string | undefined>();
   const [lines, setLines] = useState<Line[]>([]);
+  // Gated policy. gateOpen: the agent hears the microphone. audible: the
+  // agent's voice is played. speak() makes the agent audible first; the
+  // microphone follows once the agent has finished speaking.
   const [gateOpen, setGateOpen] = useState(false);
+  const [audible, setAudible] = useState(false);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [draft, setDraft] = useState("");
   // Why Scribe is not running, when connecting it failed.
@@ -108,6 +124,12 @@ function VoicePanelInner({
   const live = useRef({
     status: "idle" as VoiceStatus,
     gateOpen: false,
+    audible: false,
+    // speak() was called and the microphone has not been opened for the answer yet.
+    micDue: false,
+    micTimer: null as ReturnType<typeof setTimeout> | null,
+    // Date.now() of the first partial transcript of the utterance in progress.
+    segmentStartedAt: null as number | null,
     agentSpeaking: false,
     lastUserSpeechAt: null as number | null,
     lastAgentSpeechAt: null as number | null,
@@ -160,11 +182,15 @@ function VoicePanelInner({
   const emit = useCallback((event: VoiceEvent) => listeners.current.forEach((l) => l(event)), []);
   const emitState = useCallback(() => emit({ type: "state", state: getState() }), [emit, getState]);
 
-  // Every final utterance goes to the session transcript.
+  // Every final utterance goes to the session transcript. `startedAt` is
+  // Date.now() of the moment the speech started; the stored `t` is that
+  // moment in session time, so a quote can be tied to what was on screen
+  // while it was said. Without it the time of the call is used.
   const record = useCallback(
-    (speaker: Speaker, text: string) => {
+    (speaker: Speaker, text: string, startedAt?: number) => {
       if (pausedRef.current) return; // off the record: not shown, not stored
-      const at = Date.now();
+      const endedAt = Date.now();
+      const at = Math.min(startedAt ?? endedAt, endedAt);
       addLine(speaker === "agent" ? "agent" : "person", text);
       const started = live.current.startedAtMs;
       fetch(`/api/sessions/${sessionId}/transcript`, {
@@ -175,19 +201,33 @@ function VoicePanelInner({
         .then((r) => (r.ok ? r.json() : null))
         .then((stored) => {
           const item = Array.isArray(stored) ? stored[0] : stored;
-          emit({ type: "utterance", speaker, text, at, transcriptId: item?.id });
+          emit({ type: "utterance", speaker, text, at, endedAt, transcriptId: item?.id });
         })
-        .catch(() => emit({ type: "utterance", speaker, text, at }));
+        .catch(() => emit({ type: "utterance", speaker, text, at, endedAt }));
     },
     [addLine, emit, phase, sessionId],
   );
+
+  // Gated policy: lets the agent hear the microphone for the answer.
+  const openMicForAnswer = useCallback(() => {
+    const l = live.current;
+    if (l.micTimer) clearTimeout(l.micTimer);
+    l.micTimer = null;
+    if (!l.micDue || pausedRef.current) return;
+    l.micDue = false;
+    l.gateOpen = true;
+    setGateOpen(true);
+    emitState();
+  }, [emitState]);
+  const openMicRef = useRef(openMicForAnswer);
+  openMicRef.current = openMicForAnswer;
 
   const conversation = useConversation({
     // Paused: the agent hears nothing and is not played, whatever the policy.
     micMuted: textOnly ? undefined : paused ? true : gated ? !gateOpen : false,
     // Gated: anything the agent says outside a question window is not played.
     // (Text conversations have no audio: setVolume throws there.)
-    volume: textOnly ? undefined : paused || (gated && !gateOpen) ? 0 : 1,
+    volume: textOnly ? undefined : paused || (gated && !gateOpen && !audible) ? 0 : 1,
     onConnect: () => {
       live.current.status = "connected";
       setStatus("connected");
@@ -207,9 +247,12 @@ function VoicePanelInner({
     },
     onModeChange: ({ mode: m }) => {
       const speaking = m === "speaking";
-      if (live.current.agentSpeaking && !speaking) live.current.lastAgentSpeechAt = Date.now();
+      const finished = live.current.agentSpeaking && !speaking;
+      if (finished) live.current.lastAgentSpeechAt = Date.now();
       live.current.agentSpeaking = speaking;
       setAgentSpeaking(speaking);
+      // The agent has said the question: now the answer may reach it.
+      if (finished && live.current.micDue && live.current.lastAgentText) openMicRef.current();
       emitState();
     },
     onVadScore: ({ vadScore }) => {
@@ -225,12 +268,19 @@ function VoicePanelInner({
         if (!text) return;
         live.current.lastAgentText = text;
         live.current.lastAgentSpeechAt = Date.now();
-        if (gated && !live.current.gateOpen) {
+        if (gated && !live.current.gateOpen && !live.current.audible) {
           // Not asked for and not audible. Shown for debugging, not recorded.
           addLine("agent", text, true);
           return;
         }
         record("agent", text);
+        if (live.current.micDue) {
+          // The microphone opens when the agent stops speaking (onModeChange).
+          // If that is not reported, it opens after the time the text takes to say.
+          if (live.current.micTimer) clearTimeout(live.current.micTimer);
+          const sayMs = text.split(/\s+/).length * MS_PER_SPOKEN_WORD;
+          live.current.micTimer = setTimeout(() => openMicRef.current(), MIC_OPEN_FALLBACK_MS + sayMs);
+        }
         return;
       }
       if (message.startsWith(APP_PREFIX) || isEmptyUtterance(message)) return;
@@ -264,18 +314,27 @@ function VoicePanelInner({
       if (!scribeClosing.current) setScribeProblem("the connection closed");
     },
     commitStrategy: CommitStrategy.VAD,
-    vadSilenceThresholdSecs: 1.0,
+    vadSilenceThresholdSecs: SCRIBE_SILENCE_SECS,
     onPartialTranscript: ({ text }) => {
-      if (pausedRef.current || !text.trim() || live.current.agentSpeaking) return;
-      live.current.lastUserSpeechAt = Date.now();
+      if (pausedRef.current || !text.trim()) return;
+      const now = Date.now();
+      // The first partial of an utterance marks where its speech started.
+      live.current.segmentStartedAt ??= now - PARTIAL_LAG_MS;
+      if (!live.current.agentSpeaking) live.current.lastUserSpeechAt = now;
     },
     onCommittedTranscript: ({ text }) => {
+      const startedAt = live.current.segmentStartedAt;
+      live.current.segmentStartedAt = null;
       if (pausedRef.current) return; // a result that was in flight when paused
       const said = text.trim();
       if (!said || isEmptyUtterance(said)) return;
       if (soundsLike(said, live.current.lastAgentText)) return; // the agent's own voice through the speakers
-      live.current.lastUserSpeechAt = Date.now();
-      record(human, said);
+      // The commit comes after the silence that ended the utterance, so the
+      // speech itself ended that much earlier.
+      const spokeUntil = Date.now() - SCRIBE_SILENCE_SECS * 1000;
+      live.current.lastUserSpeechAt = Math.max(live.current.lastUserSpeechAt ?? 0, spokeUntil);
+      // No partial was seen for it: estimate the start from the length.
+      record(human, said, startedAt ?? spokeUntil - said.split(/\s+/).length * MS_PER_SPOKEN_WORD);
       // While the gate is closed the agent did not hear this.
       if (!live.current.gateOpen) sendContext(heardUpdate(said));
     },
@@ -288,11 +347,18 @@ function VoicePanelInner({
     emitState();
   }, [scribe.status, emitState]);
 
+  // Opens or closes the question window as a whole: microphone and agent audio.
   const setGate = useCallback(
     (wanted: boolean) => {
       const open = wanted && !pausedRef.current; // never opens while paused
-      live.current.gateOpen = open;
+      const l = live.current;
+      if (l.micTimer) clearTimeout(l.micTimer);
+      l.micTimer = null;
+      l.micDue = false;
+      l.gateOpen = open;
+      l.audible = open;
       setGateOpen(open);
+      setAudible(open);
       emitState();
     },
     [emitState],
@@ -395,6 +461,7 @@ function VoicePanelInner({
   useEffect(() => {
     if (!paused) return;
     live.current.pendingContext.length = 0;
+    live.current.segmentStartedAt = null;
     setGate(false);
     return () => emitState();
   }, [paused, setGate, emitState]);
@@ -410,11 +477,30 @@ function VoicePanelInner({
 
   const speak = useCallback(
     (instruction: string) => {
-      if (live.current.status !== "connected" || pausedRef.current) return;
-      if (gated) setGate(true);
-      convRef.current.sendUserMessage(appInstruction(instruction));
+      const l = live.current;
+      if (l.status !== "connected" || pausedRef.current) return false;
+      try {
+        // Throws when the SDK has no active conversation (it ended a moment ago).
+        convRef.current.sendUserMessage(appInstruction(instruction));
+      } catch {
+        return false;
+      }
+      if (gated && !l.gateOpen) {
+        // Audible now, microphone later. If the microphone opened here, the
+        // next word said in the room would reach the agent as a new turn and
+        // replace the question before it is spoken.
+        l.audible = true;
+        l.micDue = true;
+        l.lastAgentText = "";
+        setAudible(true);
+        try {
+          convRef.current.setVolume({ volume: 1 });
+        } catch {}
+        emitState();
+      }
+      return true;
     },
-    [gated, setGate],
+    [gated, emitState],
   );
 
   const sendText = useCallback(
@@ -468,6 +554,8 @@ function VoicePanelInner({
   // End the session when the panel goes away.
   useEffect(
     () => () => {
+      const l = live.current;
+      if (l.micTimer) clearTimeout(l.micTimer);
       scribeClosing.current = true;
       try {
         scribeRef.current.disconnect();
@@ -506,7 +594,9 @@ function VoicePanelInner({
         : gated
           ? gateOpen
             ? "Listening for your answer"
-            : "Quiet while you work"
+            : audible
+              ? "Asking"
+              : "Quiet while you work"
           : "Listening";
   const dot = paused
     ? "bg-zinc-400"
