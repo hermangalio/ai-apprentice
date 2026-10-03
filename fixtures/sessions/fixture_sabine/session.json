@@ -1,0 +1,8 @@
+{
+  "id": "fixture_sabine",
+  "role": "expert",
+  "personName": "Sabine",
+  "task": "Process supplier invoices before month-end close",
+  "startedAt": "2026-10-03T14:10:00.000Z",
+  "endedAt": "2026-10-03T14:18:30.000Z"
+}

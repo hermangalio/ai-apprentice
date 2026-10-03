@@ -1,0 +1,328 @@
+{
+  "sessionId": "fixture_sabine",
+  "task": "Process supplier invoices before month-end close",
+  "expertName": "Sabine",
+  "steps": [
+    {
+      "id": "s_01",
+      "index": 1,
+      "title": "Open the next invoice from the queue",
+      "moment": {
+        "t": 31000,
+        "frameId": "frm_02",
+        "label": "00:31, invoice 4471 opened"
+      },
+      "decision": "Took the oldest open invoice first",
+      "isJudgmentCall": false,
+      "guardrailIds": [],
+      "eventIds": [
+        "evt_01",
+        "evt_02"
+      ]
+    },
+    {
+      "id": "s_02",
+      "index": 2,
+      "title": "Match the invoice to its purchase order",
+      "moment": {
+        "t": 58000,
+        "frameId": "frm_03",
+        "label": "00:58, invoice 4471, PO-8812"
+      },
+      "decision": "Amount and goods receipt match PO-8812",
+      "reason": {
+        "text": "Okay, first one, Kessler, tool holders. I always check it against the purchase order first.",
+        "transcriptId": "tr_01",
+        "t": 40000,
+        "source": "live"
+      },
+      "isJudgmentCall": false,
+      "guardrailIds": [],
+      "eventIds": [
+        "evt_03"
+      ]
+    },
+    {
+      "id": "s_03",
+      "index": 3,
+      "title": "Code the invoice to a cost center",
+      "moment": {
+        "t": 192000,
+        "frameId": "frm_04",
+        "label": "03:12, invoice 4471, cost center field"
+      },
+      "decision": "Re-coded from opex (4711) to capex (0400)",
+      "reason": {
+        "text": "Equipment over 5,000 euros is always capex. It doesn't matter what the default code says.",
+        "transcriptId": "tr_03",
+        "t": 201000,
+        "source": "live"
+      },
+      "isJudgmentCall": true,
+      "guardrailIds": [
+        "g_01"
+      ],
+      "eventIds": [
+        "evt_04"
+      ]
+    },
+    {
+      "id": "s_04",
+      "index": 4,
+      "title": "Enter the asset number",
+      "moment": {
+        "t": 224000,
+        "frameId": "frm_05",
+        "label": "03:44, invoice 4471, asset number field"
+      },
+      "decision": "Entered asset number A-2291 before posting",
+      "reason": {
+        "text": "Never. No asset number, no capex booking. If it's missing I ask asset accounting to create one first.",
+        "transcriptId": "tr_05",
+        "t": 247000,
+        "source": "live"
+      },
+      "isJudgmentCall": false,
+      "guardrailIds": [
+        "g_02"
+      ],
+      "eventIds": [
+        "evt_05"
+      ]
+    },
+    {
+      "id": "s_05",
+      "index": 5,
+      "title": "Post the invoice",
+      "moment": {
+        "t": 236000,
+        "frameId": "frm_06",
+        "label": "03:56, invoice 4471 posted"
+      },
+      "decision": "Posted once coding and asset number were complete",
+      "isJudgmentCall": false,
+      "guardrailIds": [
+        "g_05"
+      ],
+      "eventIds": [
+        "evt_06"
+      ]
+    },
+    {
+      "id": "s_06",
+      "index": 6,
+      "title": "Check for a duplicate and hold",
+      "moment": {
+        "t": 322000,
+        "frameId": "frm_09",
+        "label": "05:22, invoice 4472 on hold"
+      },
+      "decision": "Held the Brandt December invoice instead of posting",
+      "reason": {
+        "text": "Brandt double-bills every December. Same amount as one we already paid, so it waits until I've checked it.",
+        "transcriptId": "tr_07",
+        "t": 333000,
+        "source": "live"
+      },
+      "isJudgmentCall": true,
+      "guardrailIds": [
+        "g_03"
+      ],
+      "eventIds": [
+        "evt_07",
+        "evt_08",
+        "evt_09"
+      ]
+    },
+    {
+      "id": "s_07",
+      "index": 7,
+      "title": "Route group company invoices for second approval",
+      "moment": {
+        "t": 418000,
+        "frameId": "frm_11",
+        "label": "06:58, invoice 4473 sent for approval"
+      },
+      "decision": "Sent the Czech subsidiary invoice for a second approval",
+      "reason": {
+        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "transcriptId": "tr_12",
+        "t": 481000,
+        "source": "debrief"
+      },
+      "isJudgmentCall": true,
+      "guardrailIds": [
+        "g_04"
+      ],
+      "eventIds": [
+        "evt_10",
+        "evt_11"
+      ]
+    }
+  ],
+  "guardrails": [
+    {
+      "id": "g_01",
+      "stepId": "s_03",
+      "type": "limit",
+      "rule": "Equipment over €5,000 is always capex (0400), whatever the default code says.",
+      "check": {
+        "when": "category == 'equipment' && amount > 5000",
+        "require": "cost_center == '0400'"
+      },
+      "quote": {
+        "text": "Equipment over 5,000 euros is always capex. It doesn't matter what the default code says.",
+        "transcriptId": "tr_03",
+        "t": 201000,
+        "source": "live"
+      },
+      "moment": {
+        "t": 192000,
+        "frameId": "frm_04",
+        "label": "03:12, invoice 4471, cost center field"
+      }
+    },
+    {
+      "id": "g_02",
+      "stepId": "s_04",
+      "type": "never",
+      "rule": "No asset number, no capex booking. Ask asset accounting to create one first.",
+      "escalateTo": "asset accounting",
+      "check": {
+        "when": "cost_center == '0400'",
+        "forbid": "action == 'save' && !asset_number"
+      },
+      "quote": {
+        "text": "Never. No asset number, no capex booking. If it's missing I ask asset accounting to create one first.",
+        "transcriptId": "tr_05",
+        "t": 247000,
+        "source": "live"
+      },
+      "moment": {
+        "t": 224000,
+        "frameId": "frm_05",
+        "label": "03:44, invoice 4471, asset number field"
+      }
+    },
+    {
+      "id": "g_03",
+      "stepId": "s_06",
+      "type": "exception",
+      "rule": "Brandt invoices in December are held until the controller releases them, because Brandt double-bills every December.",
+      "escalateTo": "Herr Vogel, the controller",
+      "check": {
+        "when": "supplier == 'Brandt Industriebedarf' && invoice_month == 12",
+        "require": "action == 'hold'"
+      },
+      "quote": {
+        "text": "Only Brandt, and only in December. Herr Vogel, the controller, releases it once Brandt confirms it isn't a duplicate.",
+        "transcriptId": "tr_10",
+        "t": 463000,
+        "source": "debrief"
+      },
+      "moment": {
+        "t": 322000,
+        "frameId": "frm_09",
+        "label": "05:22, invoice 4472 on hold"
+      }
+    },
+    {
+      "id": "g_04",
+      "stepId": "s_07",
+      "type": "limit",
+      "rule": "Any invoice from a group company needs a second approval from the controller, whatever the amount.",
+      "escalateTo": "the controller",
+      "check": {
+        "when": "supplier_is_group_company",
+        "require": "action == 'send_for_approval'"
+      },
+      "quote": {
+        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "transcriptId": "tr_12",
+        "t": 481000,
+        "source": "debrief"
+      },
+      "moment": {
+        "t": 418000,
+        "frameId": "frm_11",
+        "label": "06:58, invoice 4473 sent for approval"
+      }
+    },
+    {
+      "id": "g_05",
+      "stepId": "s_05",
+      "type": "stop_and_ask",
+      "rule": "Unknown supplier: stop and ask the controller. Never post it yourself.",
+      "escalateTo": "the controller",
+      "check": {
+        "when": "!supplier_known",
+        "forbid": "action == 'save'"
+      },
+      "quote": {
+        "text": "I stop and ask the controller. I never post an invoice from an unknown supplier myself.",
+        "transcriptId": "tr_14",
+        "t": 497000,
+        "source": "debrief"
+      },
+      "moment": {
+        "t": 236000,
+        "frameId": "frm_06",
+        "label": "03:56, invoice 4471 posted"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "id": "gap_01",
+      "question": "You held the December invoice. Is that for every supplier, and who decides when to release it?",
+      "why": "The hold could be a general December rule or specific to Brandt, and nobody said who releases it.",
+      "stepId": "s_06",
+      "status": "answered",
+      "answer": {
+        "text": "Only Brandt, and only in December. Herr Vogel, the controller, releases it once Brandt confirms it isn't a duplicate.",
+        "transcriptId": "tr_10",
+        "t": 463000,
+        "source": "debrief"
+      }
+    },
+    {
+      "id": "gap_02",
+      "question": "Why does the Czech subsidiary need a second approval?",
+      "why": "Sabine named the Czech subsidiary but not the rule behind the second approval.",
+      "stepId": "s_07",
+      "status": "answered",
+      "answer": {
+        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "transcriptId": "tr_12",
+        "t": 481000,
+        "source": "debrief"
+      }
+    },
+    {
+      "id": "gap_03",
+      "question": "What do you do when the supplier is one you have never seen before?",
+      "why": "All three suppliers in the session were known, so the unknown-supplier case was never seen.",
+      "status": "answered",
+      "answer": {
+        "text": "I stop and ask the controller. I never post an invoice from an unknown supplier myself.",
+        "transcriptId": "tr_14",
+        "t": 497000,
+        "source": "debrief"
+      }
+    }
+  ],
+  "teachBack": {
+    "text": "Let me say it back. You match each invoice to its purchase order. Equipment over 5,000 euros goes to capex 0400 and needs an asset number before posting. Brandt invoices in December are held until the controller releases them. Group company invoices go for a second approval, and unknown suppliers go to the controller. Invoices over 5,000 euros also need a second approval. Is that right?",
+    "confirmed": true,
+    "corrections": [
+      {
+        "text": "Almost. The second approval isn't about the amount, it's only for group companies. The rest is right.",
+        "transcriptId": "tr_16",
+        "t": 531000,
+        "source": "debrief"
+      }
+    ]
+  },
+  "status": "confirmed",
+  "updatedAt": "2026-10-03T14:19:00.000Z"
+}

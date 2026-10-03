@@ -1,0 +1,387 @@
+               7th Global AI Hackathon
+
+
+
+
+               CHALLENGE
+
+
+
+
+  01          ····················
+
+
+
+
+The AI Apprentice
+  Accelerating the world's digital operations
+
+
+
+               POWERED BY
+                   THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+
+
+Goals and Motivation
+
+Our most knowledgeable generation is retiring. More than 11,200 Americans turn 65 every day. In
+Germany, 12.9 million workers, almost 30% of the labor force, will pass retirement age by 2036.
+Worldwide, people aged 65 and over will more than double to 1.6 billion by 2050. They take decades
+of judgment about how the world's digital operations really run. To build the economy of the future, we
+must reinvent how that knowledge is captured, mapped and taught to the next generation, before it
+walks out of the door.
+
+Meet Sabine. She is 57 and has run accounts payable at a machine builder near Stuttgart for 24
+years. It is Thursday, 4:10 pm, two days before month-end close, with 60 invoices still open. Lena, 26,
+who started on Monday, is watching Sabine's screen over a video call. Sabine moves one invoice to
+another cost center without a word, holds a second because that supplier double-bills every
+December, and sends a third for a second approval because it comes from the Czech subsidiary.
+Lena catches half of it. The 2019 process document covers even less. Sabine retires in 18 months,
+and 24 years of judgment will leave with her.
+
+Everything needed already exists. Browsers share screens, and vision models can read what
+changes on them. An ElevenLabs voice agent can stay quiet while someone types, then ask the one
+question that matters at the right pause. What is missing is the apprentice that watches how screen
+work is really done, asks why, maps the workflow with its guardrails and teaches the next Lena what
+Sabine knows.
+
+That gap is what this challenge asks you to close.
+
+
+
+Current Challenges
+
+  KNOWLEDGE LIVES IN            What makes experienced people good at their job was never written down. New
+  HEADS                         hires learn it slowly, over a shoulder.
+
+
+  RECORDINGS SHOW               Screen recordings, how-to videos and task-mining logs capture clicks. They
+  WHAT, NOT WHY                 cannot tell a deliberate judgment call from a habit or a mistake.
+
+
+  GUARDRAILS ARE                Limits, exceptions and the moment to stop and ask are rarely written down. New
+  INVISIBLE                     hires learn them by breaking them.
+
+
+
+
+Your Challenge
+
+Build the AI Apprentice: a working end-to-end MVP that captures what an expert knows while they
+work, maps it into a workflow anyone can follow and teaches it to the next generation. An ElevenLabs
+voice agent watches the expert's screen, asks why at the right moments and runs a short debrief until
+it fully understands the process.
+
+
+
+
+                       Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 2
+                     THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+The conversation is the core. The expert shares their screen and does a real task. The voice agent
+stays quiet while they type and asks short spoken questions at natural pauses: why this step, what
+would change the decision, what they would never do.
+
+The debrief closes the gaps. When the task is done, the apprentice asks about the exceptions it
+noticed, the rules it is unsure about and the cases it has not seen. Then it explains the process back
+until the expert says: yes, that is how it works.
+
+Your use case, your interface. Invoicing is our running example, but any knowledge-driven desk
+work fits: insurance claims, procurement, support escalations, KYC checks. The interface is yours too:
+a side panel, a floating voice companion, a replayable timeline or a coaching overlay. Experiment.
+
+
+  An apprentice, not a              A recorder captures what happened. An automation tool copies the clicks. An
+  recorder                          apprentice asks why, learns the rules and guardrails behind each step, and keeps
+                                    asking until nothing is unclear. If a new person could not do the task from what it
+                                    learned, it is not an AI Apprentice.
+
+
+
+
+Modules
+
+Build all three.
+
+  1. Capture                             2. Map                                   3. Teach
+  A screen-share app with a voice        A debrief that turns the session         A voice tutor that coaches a new
+  agent that asks why while the          into a clickable Work Map                hire on their own screen
+  expert works
+
+
+
+Module 1: Capture
+
+Build a web app where the expert shares their screen and an ElevenLabs agent listens in a side
+panel. Every second or two, send a frame to a vision model and turn what changed into events:
+invoice 4471 opened, cost center changed from 4711 to 0400. The agent stays quiet while the expert
+types, reads or talks, and asks at natural pauses: why this step, is there a limit, when would you stop
+and ask someone?
+
+
+  Required                          During a real task, the agent asks at least three questions, each at a natural
+                                    pause and about something visible on screen. At least one is about a guardrail.
+
+
+
+Module 2: Map
+
+When the task ends, the apprentice runs a short spoken debrief. It asks about what is still unclear,
+then explains the whole process back in its own words so the expert can confirm or correct it. The
+result is the Work Map: a clickable timeline where every step shows the screen moment, the decision,
+the reason in the expert's words and the guardrails around it.
+
+
+
+
+                         Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 3
+                    THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+
+  Example step                  Step 4 of 7: code the invoice to a cost center
+
+
+  Screen moment                 03:12, invoice 4471, cost center field
+
+
+  Decision                      Re-coded from opex (4711) to capex (0400)
+
+
+  Reason                        "Equipment over €5,000 is always capex." Sabine, live question at 03:15
+
+
+  Guardrails                    No asset number, no capex booking. Unknown supplier: stop and ask the
+                                controller.
+
+
+
+  Required                      The debrief asks at least three follow-up questions that were not answered during
+                                the task and ends with a teach-back the expert confirms. Every step and guardrail
+                                links to a screen moment and the expert's own words.
+
+
+
+Module 3: Teach
+
+Turn the Work Map into a voice tutor for the next generation. The new hire works a case on their own
+screen while the tutor watches, explains each step the way the expert did, asks them to predict the
+next decision and steps in before a guardrail is broken, replaying the expert's screen moment when it
+helps. At the end it shows what they have mastered and what to practice next.
+
+
+  Required                      A judge playing a new hire processes a case the expert never showed. The tutor
+                                catches at least one wrong decision before it is saved and explains it using the
+                                reasoning the expert gave.
+
+
+
+
+The Apprentice Test
+
+Timing is where most voice agents fail, but it is only the start. A good apprentice asks well, knows
+when it has understood and passes on what it learned. Your demo must answer five questions:
+    1. When to ask. How does the agent know the expert has paused, and stay quiet while they
+       type, read or talk?
+    2. What to ask. How does it pick the question that reveals a reason or a guardrail, instead of
+       one the screen already answers?
+    3. When it has understood. How does the debrief decide it is done, and how does the teach-
+       back prove it?
+    4. Whether the new hire learned. How do you show they can handle a new case on their own?
+    5. Trust. How can the expert take something off the record, and how is personal data on screen
+       protected?
+
+
+
+
+                        Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 4
+                    THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+
+Stretch Goals
+
+We know that you can do it.
+    •   Two experts, one task. Show where two sessions differ and ask each expert why.
+    •   Any language. The expert explains in German; the tutor teaches a new hire in English.
+    •   Agent-ready guardrails. Export the Work Map as instructions an agent can load, so it follows
+        the same steps and stops where the expert would.
+
+
+
+Think Bigger: The Moonshot
+
+Your MVP captures one expert, one task and one new hire. We also want to see where it could go.
+End your pitch with one slide: the moonshot you would build next and how today's MVP gets you
+there. Some directions to start from:
+    •   A living company memory. Every expert and every workflow in one map that stays current.
+        When the work changes, the apprentice asks only about what is new.
+    •   The always-on apprentice. No scheduled sessions. It notices a case it has never seen
+        during everyday work and asks one question at the right moment.
+    •   People first, then agents. The steps and guardrails that teach a new hire also let agents
+        take routine steps safely, while people keep the judgment calls.
+    •   The world's operations manual. Anonymized Work Maps across thousands of companies
+        that show how the world's digital work is really done, and teach it to anyone, anywhere.
+
+
+
+Built with ElevenLabs
+
+The voice agent is the product, so it has to feel like a thoughtful colleague.
+    •   ElevenAgents plays both roles, interviewer and tutor, with Expressive Mode for a curious,
+        patient voice.
+    •   Your choice of LLM. ElevenAgents lets you pick the model behind the agent. It decides what
+        to ask, when, and when it has understood enough.
+    •   Scribe v2 Realtime listens while people work and knows when they pause, so the agent
+        speaks at the right moment.
+
+
+One way to wire it
+    1. The browser shares the screen. A frame every one to two seconds goes to a vision model,
+       which returns events, not video.
+    2. Client tools push those events into the ElevenAgents conversation, so the agent knows what
+       is on screen.
+    3. After the task, an LLM merges events, transcript and answers into Work Map JSON and lists
+       what is still unclear for the debrief.
+
+
+
+
+                        Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 5
+                     THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+   4. The Work Map goes into the tutor's knowledge base and Procedures, and the tutor watches
+      the new hire's screen the same way.
+
+
+Two tips
+   •     Start with voice and one screen. Get screen events into the agent's context before anything
+         else.
+   •     Ask less, later. Three to five live questions per ten minutes; the rest waits for the debrief.
+
+
+
+Data Sources and Hints
+
+ Category               Source                                       Use
+
+
+ Your own workflow      Record yourself or a teammate                The most honest test data you will get
+
+ Agent brain            ElevenAgents LLM options:                    Choose the model behind the interviewer
+                        elevenlabs.io/docs/agents-                   and the tutor
+                        platform/customization/llm
+
+ Screen                 Any vision-capable model, such as Claude,    Describe what changed between screen
+ understanding          Gemini or GPT                                frames
+
+ Debrief and Work       An agent framework of your choice            Merge events, transcript and answers;
+ Map                                                                 find the gaps
+
+ Tools                  ElevenLabs MCP tools:                        Let the tutor look up guardrails through an
+                        elevenlabs.io/docs/eleven-                   MCP server
+                        agents/customization/tools/mcp
+
+ Tasks and roles        O*NET database:                              18,838 tasks across 1,016 occupations
+                        onetcenter.org/database.html                 (CC BY 4.0)
+
+ Screen sandbox         WebArena: webarena.dev                       Self-hosted web apps with fake data
+
+ Privacy                Microsoft Presidio:                          Redact personal data in transcripts and
+                        github.com/microsoft/presidio                frames
+
+
+
+
+                         Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 6
+                     THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+
+Bring Your Own Workflow
+
+The best demo is a workflow you know well, from your own job or a teammate's. Run it on fake or
+sandbox data. A good one:
+    •    Takes 5 to 10 minutes on screen.
+    •    Hides at least one judgment call that is not written down anywhere.
+    •    Has real guardrails: a limit, an exception, a moment to stop and ask someone.
+
+
+  No workflow of your             Use our running example: three supplier invoices in a sandbox ERP, one over the
+  own?                            €5,000 capex line and one from a supplier that double-bills in December.
+
+
+
+
+What Good Looks Like
+
+A judge playing Sabine shares their screen and processes three invoices while talking. At a pause, a
+calm voice asks: "You moved that one to capex. What made you do that?" The judge explains that
+equipment over €5,000 is always capex. In the debrief it asks: "You held the December invoice. Is that
+for every supplier, and who decides when to release it?" Then it explains the whole process back in
+under a minute, and the judge corrects one detail. The Work Map shows seven steps, three judgment
+calls and four guardrails, each linked to its moment on screen. Then a second judge, playing a new
+hire, opens a fresh €7,200 equipment invoice and reaches for the opex code. The tutor says: "Sabine
+would stop here. Why do you think?" It replays her screen moment and lets them fix it. That is the bar.
+
+
+
+What Makes a Strong Submission
+
+ Strong                                                  Weak
+
+
+ Asks at natural pauses, about what is on screen         Interrupts mid-typing, or asks generic questions
+
+ Captures guardrails: limits, exceptions, when to        Captures only the happy path
+ stop and ask
+
+ The debrief closes gaps and ends with a teach-back      A summary written from the transcript afterwards
+
+ The tutor teaches a new hire to decide, in the          A screen recording nobody will watch
+ expert's words
+
+ A pitch with a clear moonshot and a path to it          A demo that stops at the demo
+
+
+
+
+Why This Matters
+
+The US Department of Labor's O*NET database lists 18,838 tasks across 1,016 occupations, and the
+judgment inside each rarely makes it onto paper. Gartner expects over 40% of agentic AI projects to
+
+
+
+
+                         Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 7
+                   THE AI APPRENTICE · ElevenLabs × Hack-Nation · Challenge Brief
+
+
+be canceled by the end of 2027, citing escalating costs, unclear business value or inadequate risk
+controls. Much of what those projects miss is knowledge that lives only in someone's head.
+
+Voice changes who can share that knowledge: an expert who would never write a process document
+will happily explain their work while doing it. The company that gets this right turns every retiring
+expert into a Work Map and a tutor instead of a farewell party.
+
+
+
+Appendix
+
+    •   ElevenAgents quickstart: elevenlabs.io/docs/eleven-agents/quickstart
+    •   ElevenLabs Startup Grants: elevenlabs.io/startup-grants
+    •   Sources: UN News, Jan 2023 (news.un.org/en/story/2023/01/1132392); Alliance for Lifetime
+        Income, Aug 2024 (protectedincome.org/news/analysis-peak-65-boom); Destatis, Aug 2022
+        (destatis.de/EN/Press/2022/08/PE22_330_13.html); Gartner, 25 June 2025
+        (gartner.com/en/newsroom); O*NET 31.0 Database (onetcenter.org/database.html)
+
+
+
+
+                       Hack-Nation × ElevenLabs · 7th Global AI Hackathon · Page 8
+
