@@ -1,28 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import type { ScreenCapture } from "@/lib/capture/useScreenCapture";
 
-// Start/stop sharing, recording indicator, pause toggle and "Off the record".
-export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: ScreenCapture; offRecordSeconds?: number }) {
+// Start/stop sharing, recording indicator and pause toggle.
+export function CaptureControls({ capture }: { capture: ScreenCapture }) {
   const { status, paused, error } = capture;
   const sharing = status === "sharing";
   const recording = sharing && !paused;
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const offRecord = async () => {
-    setBusy(true);
-    setNotice(null);
-    try {
-      await capture.goOffRecord(offRecordSeconds);
-      setNotice(`Last ${offRecordSeconds} s deleted. Capture is paused.`);
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Off the record failed");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const label = recording
     ? "Recording and listening"
@@ -77,7 +61,6 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
         <button
           type="button"
           onClick={() => {
-            setNotice(null);
             capture.setPaused(!paused);
           }}
           aria-pressed={paused}
@@ -87,19 +70,7 @@ export function CaptureControls({ capture, offRecordSeconds = 30 }: { capture: S
         </button>
         )}
 
-        {sharing && (
-        <button
-          type="button"
-          onClick={() => void offRecord()}
-          disabled={busy}
-          title={`Pause and delete the last ${offRecordSeconds} seconds of frames, events and transcript`}
-          className="rounded border border-amber-400 bg-amber-50 px-3 py-1 text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-        >
-          Off the record
-        </button>
-        )}
       </div>
-      {notice && <p className="text-amber-800">{notice}</p>}
       {error && status === "error" && <p className="text-red-700">{error}</p>}
     </div>
   );
