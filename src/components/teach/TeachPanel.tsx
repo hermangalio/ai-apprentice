@@ -548,8 +548,8 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
 
             {/* Prediction question */}
             {cueVisible && cue && (
-              <section className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900">Your call first</p>
+              <section className="rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-900">Your call first</p>
                 <p className="mt-1.5 text-sm font-semibold leading-snug">{cue.prompt}</p>
                 {!cue.revealed ? (
                   <>
@@ -558,19 +558,19 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                       onChange={(e) => setCue((c) => (c ? { ...c, answer: e.target.value } : c))}
                       rows={2}
                       placeholder="Say it to the tutor, or type it here"
-                      className="mt-2 w-full rounded-md border border-sky-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500"
+                      className="mt-2 w-full rounded-md border border-indigo-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-indigo-500"
                     />
                     <button
                       type="button"
                       onClick={() => setCue((c) => (c ? { ...c, revealed: true } : c))}
-                      className="mt-2 rounded-md bg-sky-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-900"
+                      className="mt-2 rounded-md bg-indigo-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-900"
                     >
                       Show what {who} does
                     </button>
                   </>
                 ) : (
                   <>
-                    <blockquote className="mt-2 border-l-4 border-sky-800 pl-3 text-sm leading-snug">
+                    <blockquote className="mt-2 border-l-4 border-indigo-800 pl-3 text-sm leading-snug">
                       “{cue.quote}”<footer className="mt-1 text-xs text-stone-600">{who}</footer>
                     </blockquote>
                     <p className="mt-2 text-xs text-stone-700">{cue.rule}</p>
@@ -578,7 +578,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                       <button
                         type="button"
                         onClick={() => void logPrediction(true)}
-                        className="rounded-md border border-sky-800 px-3 py-1.5 text-xs font-medium text-sky-900 hover:bg-sky-100"
+                        className="rounded-md border border-indigo-800 px-3 py-1.5 text-xs font-medium text-indigo-900 hover:bg-indigo-100"
                       >
                         I had that
                       </button>

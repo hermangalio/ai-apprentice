@@ -12,10 +12,10 @@ type Lane = { name: string; description: string; steps: WorkStep[] };
 // takes the finishing colour.
 const LANE_TINT = [
   "bg-indigo-50/70 border-indigo-100",
-  "bg-sky-50/70 border-sky-100",
+  "bg-indigo-50/70 border-indigo-100",
   "bg-emerald-50/60 border-emerald-100",
 ];
-const BADGE_TINT = ["bg-indigo-100 text-indigo-800", "bg-sky-100 text-sky-800", "bg-emerald-100 text-emerald-800"];
+const BADGE_TINT = ["bg-indigo-100 text-indigo-800", "bg-indigo-100 text-indigo-800", "bg-emerald-100 text-emerald-800"];
 
 function lanesOf(map: WorkMap): Lane[] {
   const steps = [...map.steps].sort((a, b) => a.index - b.index);

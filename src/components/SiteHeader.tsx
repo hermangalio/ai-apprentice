@@ -13,8 +13,8 @@ export function LogoMark({ size = 30 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="apprentice-mark" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#4a3cd8" />
-          <stop offset="1" stopColor="#6454ec" />
+          <stop offset="0" stopColor="#3e0f8f" />
+          <stop offset="1" stopColor="#6a2bd0" />
         </linearGradient>
       </defs>
       <path

@@ -43,7 +43,7 @@ export function EventFeed({
           </span>
           <span
             className={`shrink-0 rounded-lg px-1.5 text-[10px] uppercase tracking-wide ${
-              e.source === "dom" ? "bg-sky-100 text-sky-800" : "bg-stone-200 text-stone-700"
+              e.source === "dom" ? "bg-indigo-100 text-indigo-800" : "bg-stone-200 text-stone-700"
             }`}
           >
             {e.source}

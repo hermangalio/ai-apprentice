@@ -4,7 +4,7 @@
   --background: #f8f8fc;
   --foreground: #14142b;
   /* The violet of the brand mark. */
-  --brand: #4f46e5;
+  --brand: #4b13ab;
 }
 
 @theme inline {
@@ -26,8 +26,18 @@
   --color-stone-800: #26263d;
   --color-stone-900: #14142b;
 
-  /* The accents are written as `indigo-*` throughout, and Tailwind's own
-     indigo is the violet of the brand mark, so the scale is left alone. */
+  /* The accents are written as `indigo-*` throughout. The scale is
+     redefined as the brand purple, with #4b13ab as the main shade (600). */
+  --color-indigo-50: #f6f1fd;
+  --color-indigo-100: #ece1fb;
+  --color-indigo-200: #d9c4f7;
+  --color-indigo-300: #be9cf0;
+  --color-indigo-400: #9b68e3;
+  --color-indigo-500: #763ad0;
+  --color-indigo-600: #4b13ab;
+  --color-indigo-700: #3e0f8f;
+  --color-indigo-800: #320c73;
+  --color-indigo-900: #260958;
 }
 
 /* The app is designed for a light theme only. */
@@ -42,7 +52,7 @@ body {
 }
 
 ::selection {
-  background: #e0e0fb;
+  background: #e3d3f9;
 }
 
 /* Keyboard focus that matches the brand on every control. */
@@ -66,8 +76,8 @@ textarea:focus {
 
 /* Landing page decoration. */
 @keyframes ai-pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgb(79 70 229 / 0.35); }
-  100% { box-shadow: 0 0 0 10px rgb(79 70 229 / 0); }
+  0% { box-shadow: 0 0 0 0 rgb(75 19 171 / 0.35); }
+  100% { box-shadow: 0 0 0 10px rgb(75 19 171 / 0); }
 }
 .ai-pulse {
   animation: ai-pulse-ring 1.8s ease-out infinite;

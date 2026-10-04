@@ -23,7 +23,7 @@ type Props = {
 const POLL_MS = 2500;
 
 const TYPE_STYLE: Record<Guardrail["type"], { label: string; cls: string }> = {
-  limit: { label: "Limit", cls: "bg-sky-100 text-sky-900 ring-sky-200" },
+  limit: { label: "Limit", cls: "bg-indigo-100 text-indigo-900 ring-indigo-200" },
   exception: { label: "Exception", cls: "bg-violet-100 text-violet-900 ring-violet-200" },
   stop_and_ask: { label: "Stop and ask", cls: "bg-rose-100 text-rose-900 ring-rose-200" },
   never: { label: "Never", cls: "bg-stone-800 text-white ring-stone-800" },
