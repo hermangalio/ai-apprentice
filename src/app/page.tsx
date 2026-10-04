@@ -14,13 +14,13 @@ export default function Home() {
         <svg className="pointer-events-none absolute right-0 top-10 hidden w-[55%] max-w-3xl md:block" viewBox="0 0 600 200" fill="none" aria-hidden="true">
           <defs>
             <linearGradient id="wave" x1="0" x2="1">
-              <stop offset="0" stopColor="#4f46e5" stopOpacity="0" />
-              <stop offset="0.5" stopColor="#4f46e5" stopOpacity="0.9" />
-              <stop offset="1" stopColor="#4f46e5" stopOpacity="0.1" />
+              <stop offset="0" stopColor="#1668e0" stopOpacity="0" />
+              <stop offset="0.5" stopColor="#1668e0" stopOpacity="0.9" />
+              <stop offset="1" stopColor="#1668e0" stopOpacity="0.1" />
             </linearGradient>
           </defs>
           <path d="M0 150 C 90 150, 130 40, 230 60 S 360 150, 440 90 S 560 20, 600 40" stroke="url(#wave)" strokeWidth="2" />
-          <circle cx="440" cy="90" r="46" fill="#4f46e5" opacity="0.06" />
+          <circle cx="440" cy="90" r="46" fill="#1668e0" opacity="0.06" />
         </svg>
         <div className="mx-auto max-w-6xl px-5 pb-20 pt-16 sm:pt-24">
           <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">

@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f7;
-  --foreground: #14142b;
-  --brand: #4f46e5;
+  --background: #f6fafd;
+  --foreground: #0a2540;
+  --brand: #1668e0;
 }
 
 @theme inline {
@@ -12,18 +12,31 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 
-  /* The app's neutrals: a cool ink scale. The sandbox ERP uses slate and keeps
-     its own look. */
-  --color-stone-50: #f7f7fb;
-  --color-stone-100: #efeff6;
-  --color-stone-200: #e4e4ee;
-  --color-stone-300: #d2d2e0;
-  --color-stone-400: #9d9db4;
-  --color-stone-500: #6c6c85;
-  --color-stone-600: #56566e;
-  --color-stone-700: #3e3e56;
-  --color-stone-800: #26263d;
-  --color-stone-900: #14142b;
+  /* The app's neutrals: a blue-grey ink scale that sits under the brand blue.
+     The sandbox ERP uses slate and keeps its own look. */
+  --color-stone-50: #f6fafd;
+  --color-stone-100: #eef4fa;
+  --color-stone-200: #e2ebf3;
+  --color-stone-300: #cdd9e5;
+  --color-stone-400: #94a9bd;
+  --color-stone-500: #647e97;
+  --color-stone-600: #4d6480;
+  --color-stone-700: #35495f;
+  --color-stone-800: #1c3048;
+  --color-stone-900: #0a2540;
+
+  /* The brand blue. The app's accents are written as `indigo-*`, so the scale
+     is redefined here rather than renamed across every page. */
+  --color-indigo-50: #eff6ff;
+  --color-indigo-100: #dbeafe;
+  --color-indigo-200: #c3dcfd;
+  --color-indigo-300: #93c0fb;
+  --color-indigo-400: #5a9cf6;
+  --color-indigo-500: #2b7cf0;
+  --color-indigo-600: #1668e0;
+  --color-indigo-700: #0f56c4;
+  --color-indigo-800: #11459b;
+  --color-indigo-900: #133c7b;
 }
 
 /* The app is designed for a light theme only. */
@@ -38,7 +51,7 @@ body {
 }
 
 ::selection {
-  background: #e0e0fb;
+  background: #cfe3fd;
 }
 
 /* Keyboard focus that matches the brand on every control. */
@@ -62,8 +75,8 @@ textarea:focus {
 
 /* Landing page decoration. */
 @keyframes ai-pulse-ring {
-  0% { box-shadow: 0 0 0 0 rgb(79 70 229 / 0.35); }
-  100% { box-shadow: 0 0 0 10px rgb(79 70 229 / 0); }
+  0% { box-shadow: 0 0 0 0 rgb(22 104 224 / 0.35); }
+  100% { box-shadow: 0 0 0 10px rgb(22 104 224 / 0); }
 }
 .ai-pulse {
   animation: ai-pulse-ring 1.8s ease-out infinite;

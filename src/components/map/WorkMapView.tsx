@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { getVoice, onVoiceRegistryChange, type VoicePanelHandle, type VoiceStatus } from "@/lib/voice/registry";
 import { countsLine, debriefContext, debriefStatus, fmtT, mapCounts } from "@/lib/map/debrief";
 import { debriefClientTools } from "@/lib/map/debriefTools";
 import type { Gap, Guardrail, Quote, ScreenMoment, WorkMap, WorkStep } from "@/lib/types";
@@ -167,7 +169,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
 
       <div className="mx-auto grid max-w-[1400px] gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <main className="min-w-0 space-y-5">
-          <Timeline steps={steps} guardrails={map.guardrails} selectedId={selected?.id ?? null} onSelect={select} />
+          {steps.length > 0 && <Timeline steps={steps} guardrails={map.guardrails} selectedId={selected?.id ?? null} onSelect={select} />}
           {selected ? (
             <StepDetail
               key={selected.id}
@@ -184,52 +186,69 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
               onNext={steps[selected.index] ? () => select(steps[selected.index].id) : undefined}
             />
           ) : (
-            <div className="rounded-xl border border-stone-200 bg-white p-8 text-stone-600">This map has no steps.</div>
+            <NoSteps />
           )}
         </main>
 
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <section className="rounded-xl border border-stone-200 bg-white">
-            <div className="border-b border-stone-100 px-4 py-3">
-              <h2 className="text-sm font-semibold text-stone-900">Debrief</h2>
-              <p className="mt-0.5 text-xs text-stone-500">
-                Asks what is still unclear, then explains the process back. Done only when {map.expertName} confirms.
-              </p>
+          {/* Debrief progress. The start control lives here, next to the bar. */}
+          <section className="rounded-xl border border-stone-200 bg-white px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-bold tracking-tight text-stone-900">Debrief progress</h2>
+              {!readOnly && <DebriefButton sessionId={sessionId} />}
             </div>
 
-            <div className="px-4 py-3">
-              <div
-                className={`rounded-xl px-3 py-2 text-sm ${status.done ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}
-              >
-                {status.reason}
-              </div>
+            <div className="mt-3 flex items-baseline justify-between gap-3">
+              <span className="text-sm text-stone-500">
+                {counts.gaps - counts.openGaps} of {counts.gaps} gap{counts.gaps === 1 ? "" : "s"} resolved
+              </span>
             </div>
+            <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-stone-200">
+              <div
+                className="h-full rounded-full bg-indigo-600 transition-[width] duration-500"
+                style={{ width: `${counts.gaps === 0 ? 0 : Math.round(((counts.gaps - counts.openGaps) / counts.gaps) * 100)}%` }}
+              />
+            </div>
+            <p className="mt-3 text-sm text-stone-500">{status.done ? status.reason : "Complete the debrief to finish your work map."}</p>
 
             {!readOnly && (
-              <div className="px-4 pb-3">
-                <DebriefVoiceSlot sessionId={sessionId} context={context} clientTools={clientTools} />
+              <div className="mt-3 border-t border-stone-100 pt-3">
+                <DebriefVoiceSlot
+                  sessionId={sessionId}
+                  context={context}
+                  clientTools={clientTools}
+                  controls={false}
+                  chrome="bare"
+                  className="max-h-64"
+                  emptyState={null}
+                />
               </div>
             )}
+          </section>
 
-            <div className="border-t border-stone-100 px-4 py-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-                Gaps ({counts.gaps - counts.openGaps} of {counts.gaps} closed)
-              </h3>
-              <ul className="mt-2 space-y-3">
-                {map.gaps.map((g) => (
-                  <GapItem
-                    key={g.id}
-                    gap={g}
-                    step={steps.find((s) => s.id === g.stepId)}
-                    expertName={map.expertName}
-                    onSelectStep={select}
-                  />
-                ))}
-                {map.gaps.length === 0 && <li className="text-sm text-stone-500">No gaps recorded.</li>}
-              </ul>
+          {/* Open questions */}
+          <section className="rounded-xl border border-stone-200 bg-white px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-bold tracking-tight text-stone-900">Open questions</h2>
+              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-sm font-semibold text-indigo-700">{counts.openGaps}</span>
             </div>
+            <ul className="mt-3 space-y-2.5">
+              {map.gaps.map((g, i) => (
+                <GapItem
+                  key={g.id}
+                  gap={g}
+                  n={i + 1}
+                  step={steps.find((s) => s.id === g.stepId)}
+                  expertName={map.expertName}
+                  onSelectStep={select}
+                />
+              ))}
+              {map.gaps.length === 0 && <li className="text-sm text-stone-500">No gaps recorded.</li>}
+            </ul>
+          </section>
 
-            <div className="border-t border-stone-100 px-4 py-3">
+          <section className="rounded-xl border border-stone-200 bg-white">
+            <div className="px-4 py-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Teach-back</h3>
                 {map.teachBack?.text && (
@@ -289,6 +308,13 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
             )}
           </section>
 
+          <Link
+            href="/"
+            className="block rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-center text-base font-medium text-stone-900 hover:bg-stone-50"
+          >
+            Finish later
+          </Link>
+
           <details className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm">
             <summary className="cursor-pointer font-medium text-stone-700">What the debrief agent is given</summary>
             <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-stone-600">{context}</pre>
@@ -301,7 +327,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
 
 function Shell({ children }: { children: React.ReactNode }) {
   // Own colors, so the page reads the same in light and dark system themes.
-  return <div className="min-h-screen flex-1 bg-[#f6f5f1] font-sans text-stone-900">{children}</div>;
+  return <div className="min-h-screen flex-1 bg-[#f6fafd] font-sans text-stone-900">{children}</div>;
 }
 
 function Spinner() {
@@ -632,49 +658,149 @@ function NavButton({ onClick, label, d }: { onClick?: () => void; label: string;
   );
 }
 
-function GapItem({ gap, step, expertName, onSelectStep }: { gap: Gap; step?: WorkStep; expertName: string; onSelectStep: (id: string) => void }) {
-  const icon =
-    gap.status === "answered" ? (
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <path d="M3.5 8.5l3 2.8L12.5 5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    ) : gap.status === "deferred" ? (
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-stone-300 text-xs font-bold text-stone-700">-</span>
-    ) : (
-      <span className="block h-5 w-5 shrink-0 rounded-full border-2 border-amber-400 bg-white" />
-    );
+const GAP_PILL: Record<Gap["status"], { label: string; cls: string }> = {
+  open: { label: "Open", cls: "bg-indigo-50 text-indigo-700" },
+  answered: { label: "Answered", cls: "bg-emerald-50 text-emerald-700" },
+  deferred: { label: "Later", cls: "bg-stone-100 text-stone-600" },
+};
+
+function GapItem({
+  gap,
+  n,
+  step,
+  expertName,
+  onSelectStep,
+}: {
+  gap: Gap;
+  n: number;
+  step?: WorkStep;
+  expertName: string;
+  onSelectStep: (id: string) => void;
+}) {
+  const pill = GAP_PILL[gap.status];
   return (
-    <li className="flex gap-2.5">
-      <span className="pt-0.5">{icon}</span>
-      <div className="min-w-0">
-        <p className={`text-sm leading-snug ${gap.status === "open" ? "font-medium text-stone-900" : "text-stone-800"}`}>{gap.question}</p>
-        <p className="mt-0.5 text-xs leading-snug text-stone-500">{gap.why}</p>
-        {gap.answer && (
-          <p className="mt-1.5 rounded-md bg-stone-50 px-2.5 py-1.5 text-sm text-stone-800 ring-1 ring-stone-200">
-            “{gap.answer.text}”
-            <span className="mt-0.5 block text-xs text-stone-500">
-              {expertName}, debrief at {fmtT(gap.answer.t)}
-            </span>
-          </p>
-        )}
-        <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-stone-500">
-          <span className="font-mono">{gap.id}</span>
-          <span
-            className={
-              gap.status === "open" ? "font-medium text-amber-700" : gap.status === "answered" ? "text-emerald-700" : "text-stone-600"
-            }
-          >
-            {gap.status === "answered" && !gap.answer ? "answered, quote pending merge" : gap.status}
-          </span>
+    <li className="rounded-xl border border-stone-200 px-3.5 py-3">
+      <div className="flex gap-3">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
+          {n}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[15px] font-semibold leading-snug text-stone-900">{gap.question}</p>
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.cls}`}>{pill.label}</span>
+          </div>
+          <p className="mt-1 text-sm leading-snug text-stone-500">{gap.why}</p>
+          {gap.answer && (
+            <p className="mt-2 rounded-lg bg-stone-50 px-2.5 py-1.5 text-sm text-stone-800 ring-1 ring-stone-200">
+              &ldquo;{gap.answer.text}&rdquo;
+              <span className="mt-0.5 block text-xs text-stone-500">
+                {expertName}, debrief at {fmtT(gap.answer.t)}
+              </span>
+            </p>
+          )}
           {step && (
-            <button onClick={() => onSelectStep(step.id)} className="underline underline-offset-2 hover:text-stone-900">
+            <button
+              onClick={() => onSelectStep(step.id)}
+              className="mt-1.5 text-xs text-stone-500 underline underline-offset-2 hover:text-stone-900"
+            >
               step {step.index}: {step.title}
             </button>
           )}
-        </p>
+        </div>
       </div>
     </li>
+  );
+}
+
+// Starts and stops the debrief conversation. The panel itself is rendered
+// without controls inside the progress card, and registers its handle under
+// the session id, so this button finds it through the registry.
+function DebriefButton({ sessionId }: { sessionId: string }) {
+  const handle = useSyncExternalStore(
+    onVoiceRegistryChange,
+    useCallback(() => getVoice(sessionId), [sessionId]),
+    () => null as VoicePanelHandle | null,
+  );
+  const status = useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) =>
+        handle ? handle.subscribe((event) => (event.type === "state" ? onChange() : undefined)) : () => {},
+      [handle],
+    ),
+    useCallback(() => handle?.getState().status ?? "idle", [handle]),
+    () => "idle" as VoiceStatus,
+  );
+
+  const live = status === "connected" || status === "connecting";
+  const label = status === "connected" ? "End debrief" : status === "connecting" ? "Connecting…" : "Start debrief";
+
+  return (
+    <div className="flex items-center gap-3">
+      {!live && (
+        <span className="flex items-center gap-2 text-sm text-stone-500">
+          <span className={`h-2 w-2 rounded-full ${handle ? "bg-emerald-500" : "bg-stone-300"}`} />
+          {handle ? "Ready to connect" : "Loading"}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={!handle || status === "connecting"}
+        onClick={() => void (live ? handle?.stop() : handle?.start())}
+        className={`rounded-lg px-4 py-2.5 text-[15px] font-semibold transition disabled:opacity-50 ${
+          live
+            ? "border border-stone-300 bg-white text-stone-900 hover:bg-stone-50"
+            : "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+        }`}
+      >
+        {label}
+      </button>
+    </div>
+  );
+}
+
+// The work map before the debrief has produced any steps.
+function NoSteps() {
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white">
+      <header className="flex flex-wrap items-center gap-3 border-b border-stone-200 px-6 py-5">
+        <h2 className="text-2xl font-bold tracking-tight text-stone-900">Work map</h2>
+        <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3.5 py-1.5 text-sm font-medium text-indigo-700">
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+            <circle cx="8" cy="8" r="6.2" />
+            <path d="M8 4.6V8l2.4 1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Waiting for debrief
+        </span>
+      </header>
+
+      <div className="flex flex-col items-center px-6 py-20 text-center">
+        <span className="flex h-36 w-36 items-center justify-center rounded-full bg-indigo-50">
+          <svg viewBox="0 0 48 48" className="h-16 w-16" fill="none" stroke="#1668e0" strokeWidth="2.2" aria-hidden>
+            <rect x="19" y="5" width="13" height="9" rx="2.5" />
+            <rect x="4" y="34" width="13" height="9" rx="2.5" />
+            <rect x="31" y="34" width="13" height="9" rx="2.5" />
+            <path d="M25.5 14v10M10.5 34v-7h27v7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <h3 className="mt-8 text-3xl font-bold tracking-tight text-stone-900">No steps captured yet</h3>
+        <p className="mt-3 max-w-md text-lg text-stone-500">Answer the open questions and your work map will appear here.</p>
+
+        <div className="mt-10 flex w-full max-w-2xl items-center justify-center gap-4" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="contents">
+              {i > 0 && (
+                <svg viewBox="0 0 24 16" className="h-4 w-6 shrink-0 text-indigo-300" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M1 8h20m0 0-5-5m5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              <div className="flex h-24 flex-1 flex-col justify-center gap-2.5 rounded-xl border border-stone-200 bg-stone-50/60 px-5">
+                <span className="block h-2.5 w-4/5 rounded-full bg-indigo-100" />
+                <span className="block h-2.5 w-1/2 rounded-full bg-indigo-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
