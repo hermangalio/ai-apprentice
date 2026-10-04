@@ -97,3 +97,7 @@ Open http://localhost:3000 in Chrome and use headphones, so the agent's voice do
 - Names are sometimes misheard by speech recognition and can end up in rule text.
 - A rule only enters the Work Map if the expert shows it, says it, or is asked about it in the debrief.
 - The hosted demo has no login and stores sessions on an ephemeral disk.
+
+## Additional Features / Achieved Stretch Goals
+- Multilingual support (test on English, Arabic, French, German, and Russian)
+- Skill export for future automous agent execution
