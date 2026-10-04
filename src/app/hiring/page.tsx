@@ -297,8 +297,7 @@ function Queue({ candidates, onOpen }: { candidates: Candidate[]; onOpen: (id: s
             <th className="py-3 pr-4">Name</th>
             <th className="py-3 pr-4">Role</th>
             <th className="py-3 pr-4">University</th>
-            <th className="py-3 pr-4">Status</th>
-            <th className="py-3" />
+            <th className="py-3">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -310,14 +309,15 @@ function Queue({ candidates, onOpen }: { candidates: Candidate[]; onOpen: (id: s
               <td className="py-4 pr-4 font-semibold">
                 {c.degree} {c.university}
               </td>
-              <td className="py-4 pr-4">
-                <StatusBadge status={c.status} />
-                {hasUnsavedChanges(c) && <div className="mt-1 text-base font-bold text-amber-700">Unsaved changes</div>}
-              </td>
-              <td className="py-4 text-right">
-                <button type="button" className="rounded bg-slate-900 px-4 py-2 text-lg font-semibold text-white">
-                  Open
+              <td className="py-4">
+                <button
+                  type="button"
+                  aria-label={`Open application ${c.id}, status ${STATUS_LABEL[c.status].toLowerCase()}`}
+                  className={`inline-block rounded border-2 px-4 py-1.5 text-base font-bold uppercase tracking-wide hover:brightness-95 ${STATUS_STYLE[c.status]}`}
+                >
+                  {STATUS_LABEL[c.status]}
                 </button>
+                {hasUnsavedChanges(c) && <div className="mt-1 text-base font-bold text-amber-700">Unsaved changes</div>}
               </td>
             </tr>
           ))}

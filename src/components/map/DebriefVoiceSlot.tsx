@@ -33,7 +33,7 @@ export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoi
   }, [sessionId]);
 
   if (!loaded || loaded.sessionId !== sessionId) {
-    return <p className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500">Loading the session</p>;
+    return <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500">Loading the session</p>;
   }
   return (
     <VoicePanel

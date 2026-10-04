@@ -442,7 +442,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
         ) : (
           <>
             {/* The case on screen */}
-            <section className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
+            <section className="rounded-xl border border-stone-200 bg-white px-3 py-2.5">
               {progress.caseId ? (
                 <>
                   <div className="flex items-baseline justify-between gap-2">
@@ -454,7 +454,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                   {parts.length > 0 && (
                     <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
                       {parts.map((part) => (
-                        <span key={part} className="rounded bg-stone-100 px-1.5 py-0.5">
+                        <span key={part} className="rounded-lg bg-stone-100 px-1.5 py-0.5">
                           {part}
                         </span>
                       ))}
@@ -483,7 +483,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                   ? "border-red-300 bg-red-50"
                   : "border-amber-400 bg-amber-50";
               return (
-                <section className={`rounded-lg border-2 px-3 py-3 ${tone}`} aria-live="assertive">
+                <section className={`rounded-xl border-2 px-3 py-3 ${tone}`} aria-live="assertive">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-700">
                     {settled
                       ? "Corrected before confirming"
@@ -529,7 +529,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
 
             {/* Prediction question */}
             {cueVisible && cue && (
-              <section className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-3">
+              <section className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-900">Your call first</p>
                 <p className="mt-1.5 text-sm font-semibold leading-snug">{cue.prompt}</p>
                 {!cue.revealed ? (
@@ -616,7 +616,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                     return (
                       <li
                         key={step.id}
-                        className={`rounded-lg border px-3 py-2 ${
+                        className={`rounded-xl border px-3 py-2 ${
                           status === "current"
                             ? "border-stone-800 bg-white shadow-sm"
                             : status === "done"
@@ -640,7 +640,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                             <p className={`text-sm leading-snug ${status === "upcoming" ? "text-stone-500" : "font-medium"}`}>
                               {step.title}
                               {status === "current" && (
-                                <span className="ml-2 rounded bg-stone-800 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-white">
+                                <span className="ml-2 rounded-lg bg-stone-800 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-white">
                                   now
                                 </span>
                               )}
@@ -658,7 +658,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                                 {rules.map((g) => (
                                   <p key={g.id} className="text-xs text-stone-700">
                                     <span
-                                      className={`mr-1 rounded px-1 py-0.5 text-[10px] font-semibold uppercase ${
+                                      className={`mr-1 rounded-lg px-1 py-0.5 text-[10px] font-semibold uppercase ${
                                         p?.atStake ? "bg-amber-300 text-stone-900" : "bg-stone-200 text-stone-700"
                                       }`}
                                     >
@@ -715,7 +715,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
               type="button"
               onClick={() => void endSession()}
               disabled={ending}
-              className="rounded-lg bg-stone-900 px-3 py-2.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-60"
+              className="rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
             >
               {ending ? "Building the scorecard…" : "End session and show scorecard"}
             </button>

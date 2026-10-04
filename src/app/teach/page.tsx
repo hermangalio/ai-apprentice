@@ -40,15 +40,17 @@ export default function TeachStartPage() {
   };
 
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-5 p-8 text-stone-900">
-      <h1 className="text-2xl font-semibold">Learn a workflow</h1>
-      <label className="flex flex-col gap-1 text-sm">
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-5 py-12 text-stone-900">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">04 / Teach</p>
+      <h1 className="text-3xl font-extrabold tracking-tight">Learn a workflow</h1>
+      <p className="leading-relaxed text-stone-600">Work a case you have not seen. The tutor steps in before a guardrail is broken.</p>
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-stone-700">
         Your name
-        <input className="rounded border border-stone-300 px-3 py-2 text-base" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="rounded-lg border border-stone-300 px-3 py-2 text-base" value={name} onChange={(e) => setName(e.target.value)} />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-stone-700">
         Work Map to learn from
-        <select className="rounded border border-stone-300 px-3 py-2 text-base" value={expertId} onChange={(e) => setExpertId(e.target.value)}>
+        <select className="rounded-lg border border-stone-300 px-3 py-2 text-base" value={expertId} onChange={(e) => setExpertId(e.target.value)}>
           {experts.map((e) => (
             <option key={e.id} value={e.id}>
               {e.personName}: {e.task} ({e.id})
@@ -58,10 +60,10 @@ export default function TeachStartPage() {
       </label>
       {experts.length === 0 && <p className="text-sm text-stone-500">No confirmed Work Map yet. Capture and debrief an expert session first.</p>}
       <div className="flex gap-3">
-        <button type="button" disabled={!expertId || !name} onClick={() => void start()} className="rounded bg-stone-900 px-4 py-2 text-white disabled:opacity-40">
+        <button type="button" disabled={!expertId || !name} onClick={() => void start()} className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-40">
           Start with the tutor
         </button>
-        <a href="/hiring?set=learner" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
+        <a href="/hiring?set=learner" target="_blank" rel="noreferrer" className="rounded-lg border border-stone-300 px-4 py-2">
           Open the sandbox
         </a>
       </div>

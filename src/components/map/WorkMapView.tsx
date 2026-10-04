@@ -118,7 +118,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
             <button
               onClick={() => run("build")}
               disabled={building}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-60"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
             >
               {building && <Spinner />}
               {building ? "Building draft" : "Build draft Work Map"}
@@ -155,7 +155,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
               href={`${base}/export`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
               title="The map as instructions an agent can load: steps, rules, when to stop, who to escalate to"
             >
               Export for agents (.md)
@@ -199,7 +199,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
 
             <div className="px-4 py-3">
               <div
-                className={`rounded-lg px-3 py-2 text-sm ${status.done ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}
+                className={`rounded-xl px-3 py-2 text-sm ${status.done ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200" : "bg-amber-50 text-amber-900 ring-1 ring-amber-200"}`}
               >
                 {status.reason}
               </div>
@@ -252,7 +252,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
                   </p>
                   <ul className="mt-1.5 space-y-2">
                     {map.teachBack!.corrections.map((c, i) => (
-                      <li key={i} className="rounded-lg border-l-2 border-amber-400 bg-amber-50/60 px-3 py-2 text-sm text-stone-800">
+                      <li key={i} className="rounded-xl border-l-2 border-amber-400 bg-amber-50/60 px-3 py-2 text-sm text-stone-800">
                         “{c.text}”
                         <span className="mt-0.5 block text-xs text-stone-500">
                           {c.transcriptId ? `${map.expertName}, debrief at ${fmtT(c.t)}` : "As noted by the voice agent, not yet matched to the transcript"}
@@ -269,7 +269,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
                 <button
                   onClick={() => run("finalize")}
                   disabled={busy !== null}
-                  className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
                   title="Merge the debrief transcript into the map: answers become quotes, new guardrails are added, corrections applied"
                 >
                   {busy === "finalize" && <Spinner />}
@@ -278,7 +278,7 @@ export function WorkMapView({ sessionId, initialMap, sessionFound, task, expertN
                 <button
                   onClick={() => run("build")}
                   disabled={busy !== null || meta.building}
-                  className="inline-flex items-center gap-2 rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-60"
                 >
                   {building && <Spinner />}
                   {building ? "Rebuilding" : "Rebuild draft"}
@@ -370,14 +370,14 @@ function Timeline({
               <button
                 onClick={() => onSelect(s.id)}
                 aria-current={active ? "step" : undefined}
-                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-lg px-1.5 pb-2 pt-1 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-stone-400 ${active ? "bg-stone-100" : "hover:bg-stone-50"}`}
+                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-1.5 pb-2 pt-1 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-stone-400 ${active ? "bg-stone-100" : "hover:bg-stone-50"}`}
               >
                 <span className="text-[11px] tabular-nums text-stone-500">{fmtT(s.moment.t)}</span>
                 <span
                   className={`relative z-10 flex h-8 w-8 items-center justify-center text-sm font-semibold transition ${
                     s.isJudgmentCall
                       ? `rotate-45 rounded-md ${active ? "bg-amber-500 text-white" : "bg-amber-100 text-amber-900 ring-1 ring-amber-400"}`
-                      : `rounded-full ${active ? "bg-stone-900 text-white" : "bg-white text-stone-700 ring-1 ring-stone-300 group-hover:ring-stone-500"}`
+                      : `rounded-full ${active ? "bg-indigo-600 text-white" : "bg-white text-stone-700 ring-1 ring-stone-300 group-hover:ring-stone-500"}`
                   }`}
                 >
                   <span className={s.isJudgmentCall ? "-rotate-45" : ""}>{s.index}</span>
@@ -420,7 +420,7 @@ function FrameImage({ sessionId, moment }: { sessionId: string; moment: ScreenMo
   const [failed, setFailed] = useState(false);
   const src = moment.frameId ? `/api/sessions/${encodeURIComponent(sessionId)}/frames/${encodeURIComponent(moment.frameId)}` : "";
   return (
-    <figure className="overflow-hidden rounded-lg border border-stone-200 bg-stone-900">
+    <figure className="overflow-hidden rounded-xl border border-stone-200 bg-stone-900">
       <div className="relative aspect-video">
         {src && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -433,7 +433,7 @@ function FrameImage({ sessionId, moment }: { sessionId: string; moment: ScreenMo
         )}
       </div>
       <figcaption className="flex items-center gap-2 bg-stone-900 px-3 py-2 text-xs text-stone-200">
-        <span className="rounded bg-white/15 px-1.5 py-0.5 font-medium tabular-nums text-white">{fmtT(moment.t)}</span>
+        <span className="rounded-lg bg-white/15 px-1.5 py-0.5 font-medium tabular-nums text-white">{fmtT(moment.t)}</span>
         <span className="truncate">{moment.label.replace(/^\d{1,2}:\d{2},\s*/, "")}</span>
       </figcaption>
     </figure>
@@ -559,7 +559,7 @@ function StepDetail({
                   const style = TYPE_STYLE[g.type];
                   const isShown = shown?.frameId === g.moment.frameId && shown?.t === g.moment.t;
                   return (
-                    <li key={g.id} className="rounded-lg border border-stone-200 bg-stone-50/70 p-3">
+                    <li key={g.id} className="rounded-xl border border-stone-200 bg-stone-50/70 p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${style.cls}`}>{style.label}</span>
                         {g.escalateTo && (
@@ -575,7 +575,7 @@ function StepDetail({
                       <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
                         <button
                           onClick={() => onShow(isShown ? null : g.moment)}
-                          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ring-1 transition ${isShown ? "bg-stone-900 text-white ring-stone-900" : "bg-white text-stone-700 ring-stone-300 hover:ring-stone-500"}`}
+                          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 ring-1 transition ${isShown ? "bg-indigo-600 text-white ring-indigo-600" : "bg-white text-stone-700 ring-stone-300 hover:ring-stone-500"}`}
                           title="Show the screen moment this rule is tied to"
                         >
                           <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
@@ -585,7 +585,7 @@ function StepDetail({
                           {g.moment.label}
                         </button>
                         {g.check && (
-                          <code className="rounded bg-white px-1.5 py-1 font-mono text-[11px] text-stone-600 ring-1 ring-stone-200" title="Machine-checkable form used by the tutor">
+                          <code className="rounded-lg bg-white px-1.5 py-1 font-mono text-[11px] text-stone-600 ring-1 ring-stone-200" title="Machine-checkable form used by the tutor">
                             when {g.check.when}
                             {g.check.require ? ` → require ${g.check.require}` : ""}
                             {g.check.forbid ? ` → forbid ${g.check.forbid}` : ""}
@@ -623,7 +623,7 @@ function NavButton({ onClick, label, d }: { onClick?: () => void; label: string;
       disabled={!onClick}
       aria-label={label}
       title={label}
-      className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-30"
+      className="flex h-8 w-8 items-center justify-center rounded-xl border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-30"
     >
       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
         <path d={d} strokeLinecap="round" strokeLinejoin="round" />
