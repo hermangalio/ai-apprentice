@@ -429,6 +429,22 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
           </p>
           <h1 className="text-base font-semibold leading-snug">{workMap.task}</h1>
           <p className="text-xs text-stone-500">Learner: {session.personName}</p>
+          {/* The learner works in the sandbox window, not in this panel. */}
+          <a
+            href="/hiring?set=learner"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2.5 flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+              <rect x="1.5" y="2.5" width="13" height="9" rx="1.5" />
+              <path d="M5.5 14h5" strokeLinecap="round" />
+            </svg>
+            Open the hiring desk sandbox
+          </a>
+          <p className="mt-1.5 text-center text-[11px] leading-snug text-stone-500">
+            Put that window next to this one. You work there; the tutor watches from here.
+          </p>
         </header>
 
         {slot && <div>{slot}</div>}
@@ -469,7 +485,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                 </>
               ) : (
                 <p className="text-sm text-stone-600">
-                  Waiting for the first case. Open one in the other tab and work it as you would on your own.
+                  Waiting for the first case. Open one in the sandbox window and work it as you would on your own.
                 </p>
               )}
             </section>

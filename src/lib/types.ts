@@ -117,6 +117,19 @@ export type WorkStep = {
   isJudgmentCall: boolean;
   guardrailIds: string[];
   eventIds: string[];
+  // The phase this step belongs to, by name. Steps are drawn in the matching
+  // lane of the work map. Maps built before phases existed have none, and
+  // then every step shares one lane.
+  phase?: string; // "Review"
+  // Who does this step. Shown under the step on the work map.
+  owner?: string; // "Recruiting"
+};
+
+// A named part of the process. Phases are contiguous: every step of a phase
+// comes before every step of the next one.
+export type WorkPhase = {
+  name: string; // "Review"
+  description: string; // "Open the application and read the history."
 };
 
 export type Gap = {
@@ -139,6 +152,8 @@ export type WorkMap = {
   task: string;
   expertName: string;
   steps: WorkStep[];
+  // In order. Empty or missing on maps built before phases existed.
+  phases?: WorkPhase[];
   guardrails: Guardrail[];
   gaps: Gap[];
   teachBack?: TeachBack;

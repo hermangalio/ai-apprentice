@@ -100,7 +100,10 @@ type RawStep = {
   momentLabel?: string;
   reason?: RawQuote;
   isJudgmentCall?: boolean;
+  phase?: string;
+  owner?: string;
 };
+type RawPhase = { name?: string; description?: string };
 type RawGuardrail = {
   stepIndex?: number;
   stepId?: string;
@@ -113,7 +116,7 @@ type RawGuardrail = {
   momentLabel?: string;
 };
 type RawGap = { question?: string; why?: string; kind?: string; stepIndex?: number | null; questionId?: string | null };
-type RawDraft = { steps?: RawStep[]; guardrails?: RawGuardrail[]; gaps?: RawGap[] };
+type RawDraft = { phases?: RawPhase[]; steps?: RawStep[]; guardrails?: RawGuardrail[]; gaps?: RawGap[] };
 
 const DRAFT_SYSTEM = `You are an apprentice who watched an expert do a task on screen and listened to them talk. You now write the first draft of a Work Map: the process as ordered steps, the decisions, the reasons in the expert's own words, the guardrails, and the things you still do not understand.
 
@@ -121,6 +124,9 @@ You receive screen events (with ids and times), the transcript of what was said 
 
 Return one JSON object:
 {
+  "phases": [
+    { "name": "two or three words, e.g. 'Review'", "description": "one short sentence naming what happens in this part" }
+  ],
   "steps": [
     {
       "title": "imperative, general, e.g. 'Set the priority'",
@@ -129,7 +135,9 @@ Return one JSON object:
       "momentEventId": "the single event that best shows this step on screen",
       "momentLabel": "what is on screen at that moment, no time, e.g. 'request R-2041, priority field'",
       "reason": { "transcriptId": "tr id", "text": "exact words copied from that expert transcript item" } or null,
-      "isJudgmentCall": true or false
+      "isJudgmentCall": true or false,
+      "phase": "the name of the phase this step belongs to, exactly as written in phases",
+      "owner": "who does this step, e.g. 'Recruiting' or a named person, or null"
     }
   ],
   "guardrails": [
@@ -149,6 +157,7 @@ Return one JSON object:
 }
 
 Steps:
+- Phases: group the steps into two to four contiguous phases, in order, so that every step of a phase comes before every step of the next. Name each phase in two or three words after what happens in it. Every step carries the name of its phase.
 - Describe the process, not the log. One step per distinct kind of action, in the order it first happens. If the expert repeats the same action on several cases, that is one step. Usually 5 to 9 steps.
 - Granularity: opening the work list and opening the next case are one step ("Open the next ..."). A routine check that every case gets (for example reading its history) is its own step. Setting a value the expert chooses deliberately and the committing action that follows are separate steps, and two different fields are two steps. A lookup that leads to a special decision (hold, reroute, hand to someone else) belongs to the step of that decision, not to the routine check.
 - Every screen event belongs to exactly one step. A step that only happened for one case (a hold, a special routing) is still a step.
@@ -287,6 +296,8 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
       isJudgmentCall: !!rs.isJudgmentCall,
       guardrailIds: [],
       eventIds: ids,
+      ...(str(rs.phase) ? { phase: str(rs.phase) } : {}),
+      ...(str(rs.owner) ? { owner: str(rs.owner) } : {}),
     };
     // A judgment call needs the expert's words and a real screen moment.
     // Without them the action stays on the timeline as observed, and the
@@ -411,11 +422,20 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
       status: c.status,
     }));
 
+  // Only phases that a step actually landed in, in the order the steps run.
+  const phaseOrder: string[] = [];
+  steps.forEach((s) => {
+    if (s.phase && !phaseOrder.includes(s.phase)) phaseOrder.push(s.phase);
+  });
+  const described = new Map((raw.phases ?? []).map((p) => [str(p.name), str(p.description)]));
+  const phases = phaseOrder.map((name) => ({ name, description: described.get(name) ?? "" }));
+
   return {
     sessionId: session.id,
     task: session.task,
     expertName: session.personName,
     steps,
+    ...(phases.length ? { phases } : {}),
     guardrails,
     gaps: gaps.map((g, i) => ({ id: `gap_${pad(i + 1)}`, ...g })),
     status: "draft",

@@ -219,7 +219,7 @@ function ClarifyMock() {
         <span className="ai-pulse inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white">Answer by voice</span>
       </div>
       <div className="rounded-xl border border-stone-200 bg-indigo-50/40 p-4">
-        <p className="text-sm text-stone-700">She's from ETH. ETH goes straight to the founders…</p>
+        <p className="text-sm text-stone-700">She&rsquo;s from ETH. ETH goes straight to the founders…</p>
         <div className="mt-3 space-y-2">
           <Bar w="85%" accent />
           <Bar w="60%" accent />

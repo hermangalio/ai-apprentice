@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f7;
+  --background: #f8f8fc;
   --foreground: #14142b;
+  /* The violet of the brand mark. */
   --brand: #4f46e5;
 }
 
@@ -12,8 +13,8 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 
-  /* The app's neutrals: a cool ink scale. The sandbox ERP uses slate and keeps
-     its own look. */
+  /* The app's neutrals: a cool ink scale that sits under the brand violet.
+     The sandbox uses slate and keeps its own look. */
   --color-stone-50: #f7f7fb;
   --color-stone-100: #efeff6;
   --color-stone-200: #e4e4ee;
@@ -24,6 +25,9 @@
   --color-stone-700: #3e3e56;
   --color-stone-800: #26263d;
   --color-stone-900: #14142b;
+
+  /* The accents are written as `indigo-*` throughout, and Tailwind's own
+     indigo is the violet of the brand mark, so the scale is left alone. */
 }
 
 /* The app is designed for a light theme only. */
