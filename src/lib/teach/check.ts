@@ -469,6 +469,18 @@ export function checkEvent(workMap: WorkMap, event: ScreenEvent, history: Screen
 
   for (const g of workMap.guardrails) {
     if (!g.check) {
+      // A rule without a check that sits on the same step as checked rules
+      // is a detail of them (who to ask, what to do if it cannot be met). It
+      // is only looked at when one of those rules applies to this case.
+      const siblings = workMap.guardrails.filter((x) => x.stepId === g.stepId && x.check);
+      const siblingApplies = siblings.some((x) => {
+        try {
+          return evaluate(x.check!.when, state, known) !== false;
+        } catch {
+          return true;
+        }
+      });
+      if (siblings.length > 0 && !siblingApplies) continue;
       result.undecided.push(g);
       continue;
     }

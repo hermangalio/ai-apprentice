@@ -20,6 +20,7 @@ Patterns, with placeholder names (replace them with fields and actions of this s
 { "when": "<text_field> == '<Name as on screen>'", "require": "action == '<action>'" }   a named case always gets one action
 { "when": "<flag_field>", "forbid": "action == '<action>'" }   never do the action yourself for such a case
 Scope: a rule holds for the circumstances in which it was seen or said, not beyond them. Put every circumstance of the case the expert was working on that the rule may depend on into "when" (for example the value a choice field had at that moment), unless the expert said the rule holds always or for every case. "I do X before Y" said while handling one kind of case is a rule for that kind of case. If it is unclear how far a rule extends, keep the narrow "when" and add a gap that asks whether it also applies to the other cases.
+What to do when a rule cannot be met (for example "if nobody is free I ask X") is not a guardrail of its own: put that person into "escalateTo" of the rule it belongs to and mention it in that rule's text.
 Write a check for every guardrail whose condition can be expressed this way, including rules about one named value (a name, a place, a month). If the rule needs a fact that is not among the fields, omit the check.`;
 
 // The fact keys and action names of a session with example values, for the

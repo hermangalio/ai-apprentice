@@ -20,6 +20,7 @@ For each guardrail listed under "decide", answer with one of:
 - "violated": the learner just set a value that breaks the rule, or the event has an "action" that the rule does not allow for this case.
 How to read an action: the "action" value is the name of the button the learner pressed, and the guardrails and the recent events tell you what the actions of this workflow do. With "committed": false the learner has pressed the button and a confirmation box is open. Judge the action they are about to take: if the rule calls for a different action on this case (for example the rule says to put the case on hold and the action completes it or passes it on instead), answer "violated". With "committed": true the action is already confirmed; judge it the same way.
 Only say "violated" when the facts on hand show that the rule applies to this case.
+A guardrail that only says who to ask, or what to do when another rule cannot be met, applies only when that situation is on screen. Otherwise answer "not_applicable". A rule the expert stated while handling one kind of case does not extend to cases of a different kind unless its text says so.
 Answer with a JSON array: [{"guardrail_id": "...", "status": "...", "explanation": "one short sentence"}]`;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -40,7 +41,7 @@ export async function checkWithModel(
   const out: Pick<CheckResult, "violations" | "atRisk" | "satisfied"> = { violations: [], atRisk: [], satisfied: [] };
   if (undecided.length === 0) return out;
 
-  const session = warmSession(`teach-check:v3:${workMap.sessionId}`, { system: SYSTEM, model: "haiku", maxCalls: 20 });
+  const session = warmSession(`teach-check:v4:${workMap.sessionId}`, { system: SYSTEM, model: "haiku", maxCalls: 20 });
   const prompt = JSON.stringify(
     {
       decide: undecided.map((g) => ({ id: g.id, type: g.type, rule: g.rule, check: g.check, expert_words: g.quote.text })),

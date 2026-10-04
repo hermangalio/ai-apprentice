@@ -68,7 +68,8 @@ const RETRY_AFTER_SILENT_MS = 10_000;
 // comes within this time of the question.
 const LATE_ANSWER_MS = 60_000;
 
-type Fetched = { question: Question | null; reason: string; version: number; at: number };
+// `commit` is the time of the last confirmed action known when the fetch started.
+type Fetched = { question: Question | null; reason: string; version: number; at: number; commit: number | null };
 
 export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & { askNow: () => void } {
   const { sessionId, enabled = true } = opts;
@@ -138,6 +139,7 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
     r.fetching = true;
     r.lastFetchAt = Date.now();
     const version = r.version;
+    const commit = r.lastCommitAt ?? null;
     try {
       const res = await fetch(`/api/sessions/${sessionId}/questions/next`, {
         method: "POST",
@@ -146,10 +148,10 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
       });
       const body = await res.json();
       r.fetched = res.ok
-        ? { question: body.question ?? null, reason: body.reason ?? "", version, at: Date.now() }
-        : { question: null, reason: body.error ?? `questions/next returned ${res.status}`, version, at: Date.now() };
+        ? { question: body.question ?? null, reason: body.reason ?? "", version, at: Date.now(), commit }
+        : { question: null, reason: body.error ?? `questions/next returned ${res.status}`, version, at: Date.now(), commit };
     } catch (err) {
-      r.fetched = { question: null, reason: err instanceof Error ? err.message : "request failed", version, at: Date.now() };
+      r.fetched = { question: null, reason: err instanceof Error ? err.message : "request failed", version, at: Date.now(), commit };
     } finally {
       r.fetching = false;
     }
@@ -311,8 +313,10 @@ export function useInterviewer(opts: UseInterviewerOptions): InterviewerState & 
         r.fetched &&
         (upToDate
           ? !(r.fetched.question && now - r.fetched.at > FRESH_MS)
-          : // Chosen before the latest change: good for a short while.
-            !!r.fetched.question && now - r.fetched.at <= STALE_OK_MS);
+          : // Chosen before the latest change: good for a short while, unless
+            // an action was confirmed since. A question picked before a
+            // decision must not be asked right after it.
+            !!r.fetched.question && now - r.fetched.at <= STALE_OK_MS && r.fetched.commit === (r.lastCommitAt ?? null));
       const current = usable ? r.fetched : null;
       // Keep the server's analysis warm: ask as soon as something changed,
       // without waiting for the pause.
