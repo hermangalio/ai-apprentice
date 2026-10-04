@@ -102,6 +102,33 @@ function CaptureSession({ session, language }: { session: Session; language: str
     else voice.current?.stop();
   }, [sharing]);
 
+  // The voice connection can drop while the screen is still shared (network
+  // blip, tab throttling). Reconnect a few times instead of staying silent.
+  useEffect(() => {
+    const handle = voice.current;
+    if (!sharing || finishing || !handle) return;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = handle.subscribe((event) => {
+      if (event.type !== "state") return;
+      if (event.state.status === "connected") {
+        tries = 0;
+        return;
+      }
+      if ((event.state.status === "idle" || event.state.status === "error") && tries < 3) {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          tries += 1;
+          void handle.start();
+        }, 1500 * (tries + 1));
+      }
+    });
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [sharing, finishing]);
+
   const finish = async () => {
     setError(null);
     setFinishing("Closing the session");

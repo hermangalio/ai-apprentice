@@ -237,11 +237,18 @@ function VoicePanelInner({
       setStatus("connected");
       emitState();
     },
-    onDisconnect: () => {
+    onDisconnect: (details) => {
       live.current.status = "idle";
       live.current.agentSpeaking = false;
       setStatus("idle");
       setAgentSpeaking(false);
+      // A drop the person did not ask for is shown, not swallowed: without
+      // this the panel just reads "Not connected" with no explanation.
+      if (details?.reason && details.reason !== "user") {
+        const why = details.reason === "error" ? details.message : "the agent ended the conversation";
+        live.current.error = `The voice connection closed (${why || "no reason given"})`;
+        setError(live.current.error);
+      }
       emitState();
     },
     onError: (message: string) => {
