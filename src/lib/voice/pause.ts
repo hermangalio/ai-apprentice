@@ -42,7 +42,7 @@ export const MAX_EVENT_AGE_MS = 90_000;
 
 // After a question: the answer counts as finished when the expert has spoken
 // and then been quiet for this long.
-export const ANSWER_QUIET_MS = 2500;
+export const ANSWER_QUIET_MS = 4000;
 // If the expert says nothing at all, the question window closes after this.
 export const ANSWER_TIMEOUT_MS = 20_000;
 // Upper bound for one question window, follow-up included.

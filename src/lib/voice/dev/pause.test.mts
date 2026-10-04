@@ -76,9 +76,9 @@ const fmt = (ms: number) => `${String(Math.floor(ms / 60000)).padStart(2, "0")}:
   const ask = { askedAt: 10_000, agentSpeaking: false, lastAgentSpeechAt: 12_000 };
   assert.equal(P.evaluateAnswer({ ...ask, now: 15_000 }), "waiting");
   assert.equal(P.evaluateAnswer({ ...ask, now: 15_000, lastUserSpeechAt: 14_500 }), "answering");
-  assert.equal(P.evaluateAnswer({ ...ask, now: 18_000, lastUserSpeechAt: 14_500 }), "answered");
+  assert.equal(P.evaluateAnswer({ ...ask, now: 14_500 + P.ANSWER_QUIET_MS + 1, lastUserSpeechAt: 14_500 }), "answered");
   assert.equal(P.evaluateAnswer({ ...ask, now: 12_000 + P.ANSWER_TIMEOUT_MS + 1 }), "unanswered");
-  assert.equal(P.evaluateAnswer({ ...ask, now: 18_000, lastUserSpeechAt: 14_500, agentSpeaking: true }), "waiting");
+  assert.equal(P.evaluateAnswer({ ...ask, now: 14_500 + P.ANSWER_QUIET_MS + 1, lastUserSpeechAt: 14_500, agentSpeaking: true }), "waiting");
   console.log("unit checks passed");
 }
 

@@ -351,12 +351,16 @@ export function pickQuestion(questions: Question[], events: ScreenEvent[], now: 
     .filter((q) => ![...keysOf(q.eventIds)].some((key) => askedKey.has(`${key}:${q.kind}`)))
     .map((q) => ({ q, t: newestEvent(q), w: weight(q) }))
     .filter((x) => x.t <= now && now - x.t <= MAX_EVENT_AGE_MS)
-    // Overrides, holds, reroutes and stops first, then the most recent.
-    .sort((a, b) => b.w - a.w || b.t - a.t);
+    // The most recent decision first; among its questions, overrides, holds,
+    // reroutes and stops before routine steps.
+    .sort((a, b) => b.t - a.t || b.w - a.w);
   if (fresh.length === 0) return { question: null, reason: "nothing recent on screen that needs a question" };
 
   const hadGuardrail = live.some((q) => q.kind === "guardrail");
-  const guardrails = fresh.filter((x) => x.q.kind === "guardrail");
+  // Guardrail questions about the decision just made come first: a question
+  // about an earlier step right after a newer decision sounds out of place.
+  const newestT = Math.max(...fresh.map((x) => x.t));
+  const guardrails = fresh.filter((x) => x.q.kind === "guardrail").sort((a, b) => b.t - a.t);
   const liveKeys = new Set(live.flatMap((q) => [...keysOf(q.eventIds)]));
 
   // The last slot of the first three is reserved for a guardrail question.
@@ -365,7 +369,7 @@ export function pickQuestion(questions: Question[], events: ScreenEvent[], now: 
     return { question: null, reason: "waiting for a guardrail question (none of the first two was one)" };
   }
   // From the second question on, prefer a guardrail until one has been asked.
-  if (!hadGuardrail && live.length >= 1 && guardrails.length > 0) {
+  if (!hadGuardrail && live.length >= 1 && guardrails.length > 0 && guardrails[0].t === newestT) {
     return { question: guardrails[0].q, reason: "no guardrail question yet; preferring one" };
   }
 

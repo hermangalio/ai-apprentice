@@ -143,6 +143,9 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
         // against the names the sandbox says it can highlight.
         const g = fullRef.current?.workMap.guardrails.find((x) => x.id === v.guardrailId);
         const field = (g && highlightField(g, ERP_HIGHLIGHT_FIELDS)) ?? v.field;
+        // Several rules can be at stake at once. The sandbox shows the first
+        // one, which is also the one the tutor speaks about first.
+        if (coached) continue;
         if (field) postControl({ type: "highlight", field });
         // "broken" is already confirmed: nothing left to hold back in the sandbox.
         postControl({ type: "coach", text: v.question, field, severity: v.severity === "broken" ? "hint" : "stop" });

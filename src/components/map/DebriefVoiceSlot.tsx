@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { VoicePanel } from "@/components/voice/VoicePanel";
 import type { DebriefClientTools } from "@/lib/map/debriefTools";
+import { getVoice } from "@/lib/voice/registry";
 import type { Session } from "@/lib/types";
 
 // The debrief voice agent. `context` is debriefContext(workMap) and
@@ -32,6 +33,19 @@ export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoi
     };
   }, [sessionId]);
 
+  // The agent says goodbye after a confirmed teach-back but does not hang up.
+  // The conversation is closed for it, late enough for the goodbye to finish.
+  const tools = useMemo(
+    () => ({
+      ...clientTools,
+      teach_back_result: (params: Parameters<DebriefClientTools["teach_back_result"]>[0]) => {
+        if (params?.confirmed) setTimeout(() => getVoice(sessionId)?.stop(), 9000);
+        return clientTools.teach_back_result(params);
+      },
+    }),
+    [clientTools, sessionId],
+  );
+
   if (!loaded || loaded.sessionId !== sessionId) {
     return <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500">Loading the session</p>;
   }
@@ -40,7 +54,7 @@ export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoi
       mode="debrief"
       sessionId={sessionId}
       context={context}
-      clientTools={clientTools}
+      clientTools={tools}
       personName={loaded.session?.personName}
       task={loaded.session?.task}
     />
