@@ -27,12 +27,12 @@ export function CaptureControls({ capture }: { capture: ScreenCapture }) {
               ? "border-red-300 bg-red-50 text-red-700"
               : paused
                 ? "border-amber-300 bg-amber-50 text-amber-800"
-                : "border-zinc-300 bg-zinc-50 text-zinc-600"
+                : "border-stone-300 bg-stone-50 text-stone-600"
           }`}
         >
           <span
             className={`h-2.5 w-2.5 rounded-full ${
-              recording ? "animate-pulse bg-red-600" : paused ? "bg-amber-500" : "bg-zinc-400"
+              recording ? "animate-pulse bg-red-600" : paused ? "bg-amber-500" : "bg-stone-400"
             }`}
           />
           {label}
@@ -42,7 +42,7 @@ export function CaptureControls({ capture }: { capture: ScreenCapture }) {
           <button
             type="button"
             onClick={capture.stop}
-            className="rounded border border-zinc-300 bg-white px-3 py-1 text-zinc-800 hover:bg-zinc-100"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1 text-stone-800 hover:bg-stone-100"
           >
             Stop sharing
           </button>
@@ -51,7 +51,7 @@ export function CaptureControls({ capture }: { capture: ScreenCapture }) {
             type="button"
             onClick={() => void capture.start()}
             disabled={status === "requesting"}
-            className="rounded bg-zinc-900 px-3 py-1 text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-3.5 py-1 font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
           >
             Share screen and start
           </button>
@@ -64,7 +64,7 @@ export function CaptureControls({ capture }: { capture: ScreenCapture }) {
             capture.setPaused(!paused);
           }}
           aria-pressed={paused}
-          className="rounded border border-zinc-300 bg-white px-3 py-1 text-zinc-800 hover:bg-zinc-100"
+          className="rounded-lg border border-stone-300 bg-white px-3 py-1 text-stone-800 hover:bg-stone-100"
         >
           {paused ? "Resume" : "Pause"}
         </button>

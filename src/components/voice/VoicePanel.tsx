@@ -47,6 +47,9 @@ export type VoicePanelProps = {
   personName?: string;
   expertName?: string;
   task?: string;
+  // Transcription language (ISO code). "auto" lets the service detect it, which
+  // misfires on short utterances, so a fixed language is the default.
+  language?: string;
   // Debrief and tutor open the conversation themselves once connected.
   autoKickoff?: boolean;
   // Show the Start/Stop buttons. Turn off when the page drives the handle.
@@ -94,6 +97,7 @@ function VoicePanelInner({
   personName,
   expertName,
   task,
+  language = "en",
   autoKickoff = true,
   controls = true,
   paused = false,
@@ -309,6 +313,7 @@ function VoicePanelInner({
   const scribeClosing = useRef(false);
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
+    languageCode: language === "auto" ? undefined : language,
     onDisconnect: () => {
       // The connection dropped by itself: speech is no longer transcribed.
       if (!scribeClosing.current) setScribeProblem("the connection closed");
@@ -612,7 +617,7 @@ function VoicePanelInner({
 
   return (
     <section
-      className={`flex min-h-0 flex-col rounded-lg border border-zinc-200 bg-white text-sm text-zinc-900 ${className ?? ""}`}
+      className={`flex min-h-0 flex-col rounded-xl border border-zinc-200 bg-white text-sm text-zinc-900 ${className ?? ""}`}
       data-voice-status={status}
       data-voice-paused={paused ? "true" : undefined}
     >
@@ -627,11 +632,11 @@ function VoicePanelInner({
         </div>
         {controls &&
           (connected || status === "connecting" ? (
-            <button type="button" onClick={stop} className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">
+            <button type="button" onClick={stop} className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">
               Stop
             </button>
           ) : (
-            <button type="button" onClick={start} className="rounded bg-zinc-900 px-2 py-1 text-xs text-white hover:bg-zinc-700">
+            <button type="button" onClick={start} className="rounded-lg bg-zinc-900 px-2 py-1 text-xs text-white hover:bg-zinc-700">
               Start
             </button>
           ))}
@@ -683,9 +688,9 @@ function VoicePanelInner({
             onChange={(e) => setDraft(e.target.value)}
             placeholder={connected ? "Type what you would say" : "Start the session first"}
             disabled={!connected || paused}
-            className="min-w-0 flex-1 rounded border border-zinc-300 px-2 py-1 text-sm disabled:bg-zinc-100"
+            className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm disabled:bg-zinc-100"
           />
-          <button type="submit" disabled={!connected || paused} className="rounded bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-40">
+          <button type="submit" disabled={!connected || paused} className="rounded-lg bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-40">
             Send
           </button>
         </form>

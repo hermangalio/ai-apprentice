@@ -17,6 +17,7 @@ export default function CapturePage() {
   const [session, setSession] = useState<Session | null>(null);
   const [personName, setPersonName] = useState("Sabine");
   const [task, setTask] = useState("Process supplier invoices before month-end close");
+  const [language, setLanguage] = useState("en");
   const [error, setError] = useState<string | null>(null);
 
   const create = async () => {
@@ -29,27 +30,37 @@ export default function CapturePage() {
     setSession(await res.json());
   };
 
-  if (session) return <CaptureSession session={session} />;
+  if (session) return <CaptureSession session={session} language={language} />;
 
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-5 p-8 text-stone-900">
-      <h1 className="text-2xl font-semibold">Show the apprentice how you work</h1>
-      <p className="text-stone-600">
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-5 py-12 text-stone-900">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">01 / Capture</p>
+      <h1 className="text-3xl font-extrabold tracking-tight">Show the apprentice how you work</h1>
+      <p className="leading-relaxed text-stone-600">
         Share your screen and do a real task. Sharing starts everything: the apprentice watches, listens, stays quiet while you work and asks a short question when you pause.
       </p>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-stone-700">
         Your name
-        <input className="rounded border border-stone-300 px-3 py-2 text-base" value={personName} onChange={(e) => setPersonName(e.target.value)} />
+        <input className="rounded-lg border border-stone-300 px-3 py-2 text-base" value={personName} onChange={(e) => setPersonName(e.target.value)} />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-stone-700">
         The task you will do
-        <input className="rounded border border-stone-300 px-3 py-2 text-base" value={task} onChange={(e) => setTask(e.target.value)} />
+        <input className="rounded-lg border border-stone-300 px-3 py-2 text-base" value={task} onChange={(e) => setTask(e.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-stone-700">
+        Language you will speak
+        <select className="rounded-lg border border-stone-300 px-3 py-2 text-base" value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <option value="en">English</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="auto">Auto-detect (less reliable)</option>
+        </select>
       </label>
       <div className="flex gap-3">
-        <button type="button" disabled={!personName || !task} onClick={() => void create()} className="rounded bg-stone-900 px-4 py-2 text-white disabled:opacity-40">
+        <button type="button" disabled={!personName || !task} onClick={() => void create()} className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-40">
           Start session
         </button>
-        <a href="/erp?set=expert" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
+        <a href="/erp?set=expert" target="_blank" rel="noreferrer" className="rounded-lg border border-stone-300 px-4 py-2">
           Open the sandbox ERP
         </a>
       </div>
@@ -66,7 +77,7 @@ const PHASE_LABEL: Record<string, string> = {
   listening: "Listening to the answer",
 };
 
-function CaptureSession({ session }: { session: Session }) {
+function CaptureSession({ session, language }: { session: Session; language: string }) {
   const router = useRouter();
   const voice = useRef<VoicePanelHandle>(null);
   const capture = useScreenCapture({ sessionId: session.id });
@@ -119,7 +130,7 @@ function CaptureSession({ session }: { session: Session }) {
 
       <CaptureControls capture={capture} />
 
-      <section className="rounded-lg border border-stone-200 p-3">
+      <section className="rounded-xl border border-stone-200 p-3 bg-white shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
           <span className="font-medium">{PHASE_LABEL[interviewer.phase] ?? interviewer.phase}</span>
           <span className="text-stone-500">
@@ -133,6 +144,7 @@ function CaptureSession({ session }: { session: Session }) {
           sessionId={session.id}
           personName={session.personName}
           task={session.task}
+          language={language}
           paused={capture.paused}
           controls={false}
         />
@@ -140,11 +152,11 @@ function CaptureSession({ session }: { session: Session }) {
 
       <section>
         <h2 className="mb-1 text-sm font-semibold">What the apprentice saw ({capture.events.length})</h2>
-        <EventFeed events={capture.events} className="max-h-64 rounded border border-stone-200 p-1" />
+        <EventFeed events={capture.events} className="max-h-64 rounded-lg border border-stone-200 p-1" />
       </section>
 
       <div className="flex items-center gap-3">
-        <button type="button" disabled={!!finishing} onClick={() => void finish()} className="rounded bg-stone-900 px-4 py-2 text-white disabled:opacity-40">
+        <button type="button" disabled={!!finishing} onClick={() => void finish()} className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-40">
           Task done, start the debrief
         </button>
         {finishing && <span className="text-sm text-stone-600">{finishing}</span>}

@@ -284,8 +284,7 @@ function Queue({ invoices, onOpen }: { invoices: Invoice[]; onOpen: (id: string)
             <th className="py-3 pr-4">Description</th>
             <th className="py-3 pr-4 text-right">Amount</th>
             <th className="py-3 pr-4">Invoice date</th>
-            <th className="py-3 pr-4">Status</th>
-            <th className="py-3" />
+            <th className="py-3">Status</th>
           </tr>
         </thead>
         <tbody>
@@ -299,14 +298,15 @@ function Queue({ invoices, onOpen }: { invoices: Invoice[]; onOpen: (id: string)
               <td className="py-4 pr-4">{inv.description}</td>
               <td className="py-4 pr-4 text-right font-mono font-semibold">{formatEUR(inv.amount)}</td>
               <td className="py-4 pr-4 font-mono">{formatDate(inv.date)}</td>
-              <td className="py-4 pr-4">
-                <StatusBadge status={inv.status} />
-                {hasUnsavedChanges(inv) && <div className="mt-1 text-base font-bold text-amber-700">Unsaved changes</div>}
-              </td>
-              <td className="py-4 text-right">
-                <button type="button" className="rounded bg-slate-900 px-4 py-2 text-lg font-semibold text-white">
-                  Open
+              <td className="py-4">
+                <button
+                  type="button"
+                  aria-label={`Open invoice ${inv.id}, status ${STATUS_LABEL[inv.status].toLowerCase()}`}
+                  className={`inline-block rounded border-2 px-4 py-1.5 text-base font-bold uppercase tracking-wide hover:brightness-95 ${STATUS_STYLE[inv.status]}`}
+                >
+                  {STATUS_LABEL[inv.status]}
                 </button>
+                {hasUnsavedChanges(inv) && <div className="mt-1 text-base font-bold text-amber-700">Unsaved changes</div>}
               </td>
             </tr>
           ))}

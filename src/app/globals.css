@@ -1,15 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf9f7;
+  --foreground: #14142b;
+  --brand: #4f46e5;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
+
+  /* The app's neutrals: a cool ink scale. The sandbox ERP uses slate and keeps
+     its own look. */
+  --color-stone-50: #f7f7fb;
+  --color-stone-100: #efeff6;
+  --color-stone-200: #e4e4ee;
+  --color-stone-300: #d2d2e0;
+  --color-stone-400: #9d9db4;
+  --color-stone-500: #6c6c85;
+  --color-stone-600: #56566e;
+  --color-stone-700: #3e3e56;
+  --color-stone-800: #26263d;
+  --color-stone-900: #14142b;
 }
 
 /* The app is designed for a light theme only. */
@@ -20,5 +34,42 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #e0e0fb;
+}
+
+/* Keyboard focus that matches the brand on every control. */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Form fields on the start screens. */
+input,
+select,
+textarea {
+  background: #fff;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  border-color: var(--brand);
+}
+
+/* Landing page decoration. */
+@keyframes ai-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(79 70 229 / 0.35); }
+  100% { box-shadow: 0 0 0 10px rgb(79 70 229 / 0); }
+}
+.ai-pulse {
+  animation: ai-pulse-ring 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-pulse {
+    animation: none;
+  }
 }

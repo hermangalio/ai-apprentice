@@ -75,7 +75,7 @@ export function ExpertReplay({
   const roleLabel = slide.role === "moment" ? "The moment" : slide.role === "before" ? "Before" : "After";
 
   return (
-    <figure className="overflow-hidden rounded-lg border border-stone-300 bg-white">
+    <figure className="overflow-hidden rounded-xl border border-stone-300 bg-white">
       <div className="flex items-center justify-between bg-stone-800 px-3 py-1.5 text-xs text-stone-100">
         <span className="font-medium">{expertName}&apos;s screen</span>
         <span className="font-mono tabular-nums">
@@ -98,7 +98,7 @@ export function ExpertReplay({
           />
         )}
         {slide.role === "moment" && (
-          <span className="absolute left-2 top-2 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-900">
+          <span className="absolute left-2 top-2 rounded-lg bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-900">
             {moment.label}
           </span>
         )}

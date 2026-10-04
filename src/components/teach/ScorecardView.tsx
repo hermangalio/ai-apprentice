@@ -55,15 +55,15 @@ export function ScorecardView({
       </div>
 
       <dl className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">
+        <div className="rounded-xl border border-stone-200 bg-white px-2 py-2">
           <dt className="text-[11px] text-stone-500">Caught before saving</dt>
           <dd className="text-lg font-semibold tabular-nums text-stone-900">{caught}</dd>
         </div>
-        <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">
+        <div className="rounded-xl border border-stone-200 bg-white px-2 py-2">
           <dt className="text-[11px] text-stone-500">Saved against a rule</dt>
           <dd className="text-lg font-semibold tabular-nums text-stone-900">{broken}</dd>
         </div>
-        <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">
+        <div className="rounded-xl border border-stone-200 bg-white px-2 py-2">
           <dt className="text-[11px] text-stone-500">Predictions right</dt>
           <dd className="text-lg font-semibold tabular-nums text-stone-900">
             {right}/{answered.length}
@@ -84,7 +84,7 @@ export function ScorecardView({
             ) : (
               <ul className="space-y-2">
                 {list.map((item) => (
-                  <li key={item.id} className={`rounded-lg border px-3 py-2 ${group.tone}`}>
+                  <li key={item.id} className={`rounded-xl border px-3 py-2 ${group.tone}`}>
                     <p className="text-sm font-medium leading-snug text-stone-900">{item.label}</p>
                     <p className="mt-0.5 text-xs text-stone-600">{item.note}</p>
                     {item.quote && group.status === "practice" && (
@@ -102,7 +102,7 @@ export function ScorecardView({
         <button
           type="button"
           onClick={onBack}
-          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+          className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
         >
           Back to the session
         </button>
