@@ -470,6 +470,19 @@ export async function nextQuestion(
     questions.push(q);
     upserts.push(q);
   }
+  // A queued guardrail question is dropped once the expert has stated the
+  // limit in the answer to an earlier question about the same decision.
+  for (const q of questions) {
+    if (q.kind !== "guardrail" || q.status !== "queued" || q.eventIds.length === 0) continue;
+    const keys = keysOf(q.eventIds);
+    const answerIds = questions
+      .filter((o) => o !== q && o.status === "answered" && shares(keysOf(o.eventIds), keys))
+      .flatMap((o) => o.answerTranscriptIds ?? []);
+    if (input.transcript.some((x) => answerIds.includes(x.id) && x.speaker !== "agent" && STATES_LIMIT.test(x.text))) {
+      q.status = "dropped";
+      touch(q);
+    }
+  }
   // Questions stored earlier about something that is not a decision (an
   // uncommitted request, a repeat) are not asked live.
   const askable = questions.filter((q) => q.eventIds.length === 0 || q.eventIds.some((id) => decisionIds.has(id)));

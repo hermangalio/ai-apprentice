@@ -331,7 +331,7 @@ if (process.env.SKIP_MODEL === "1") {
   console.log("\n== Part 3: a guardrail without a `check` (model fallback) ==");
   // A copy of the fixture map as a live-built map would look: g_03 has only
   // its rule text and the expert's quote.
-  const expert = await store.sessions.create({ role: "expert", personName: workMap.expertName, task: workMap.task });
+  const expert = await store.sessions.create({ role: "expert", personName: workMap.expertName, task: `[test] ${workMap.task}` });
   await store.workMaps.set(expert.id, {
     ...workMap,
     sessionId: expert.id,

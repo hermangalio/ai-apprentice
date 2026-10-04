@@ -503,6 +503,7 @@ function CandidateDetail({
   const cancelAction = () => {
     if (!pending) return;
     setPending(null);
+    onDismissCoach(); // the stop message was about the action that is now cancelled
     emitErpEvent({ kind: "other", summary: actionCancelledSummary(pending.action, candidate), committed: false }, candidate);
   };
 

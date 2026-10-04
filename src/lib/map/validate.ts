@@ -111,11 +111,24 @@ export function resolveMoment(
     return null;
   };
 
-  const named = fromEvent(eventById.get(raw.momentEventId ?? ""));
-  if (named) return named;
+  const own = (raw.eventIds ?? []).map((id) => eventById.get(id)).filter((e): e is ScreenEvent => !!e);
+  // The model names the moment's event and writes its label separately, and
+  // the two can disagree (a label about one case, the event of another). The
+  // named event is used only if it belongs to the step and its case is the
+  // one the label talks about; otherwise the step's own event for that case.
+  const labelText = raw.momentLabel ?? "";
+  const fitsLabel = (e: ScreenEvent) => !e.entity || !/[A-Za-z]*-?\d{2,}/.test(labelText) || labelText.includes(e.entity.id);
+  const namedEvent = eventById.get(raw.momentEventId ?? "");
+  if (namedEvent && (own.length === 0 || own.includes(namedEvent)) && fitsLabel(namedEvent)) {
+    const named = fromEvent(namedEvent);
+    if (named) return named;
+  }
+  for (const e of own.filter(fitsLabel)) {
+    const m = fromEvent(e);
+    if (m) return m;
+  }
   const frame = frameById.get(raw.frameId ?? "");
   if (frame) return { t: frame.t, frameId: frame.id, label: label(frame.t, "screen") };
-  const own = (raw.eventIds ?? []).map((id) => eventById.get(id)).filter((e): e is ScreenEvent => !!e);
   for (const e of [...own].reverse()) {
     const m = fromEvent(e);
     if (m) return m;

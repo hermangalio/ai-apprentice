@@ -16,7 +16,9 @@ export default function TeachStartPage() {
     (async () => {
       const all: Session[] = await fetch("/api/sessions").then((r) => r.json());
       const withMaps: Session[] = [];
-      for (const s of all.filter((x) => x.role === "expert")) {
+      // Sessions written by test scripts are not offered.
+      const isTest = (x: Session) => x.task.startsWith("[test]") || x.id.startsWith("maptest_");
+      for (const s of all.filter((x) => x.role === "expert" && !isTest(x))) {
         const res = await fetch(`/api/sessions/${s.id}/workmap`);
         if (res.ok && (await res.json()).status === "confirmed") withMaps.push(s);
       }
