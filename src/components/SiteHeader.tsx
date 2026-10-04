@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Avatar } from "@/components/Avatar";
+import { DEFAULT_PERSON_NAME, usePersonName } from "@/lib/profile";
 
-export function LogoMark({ size = 28 }: { size?: number }) {
+export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <path d="M16 4 5 27h5.2l2.2-5h7.2l2.2 5H27L16 4Zm0 9.6 2.4 5.4h-4.8L16 13.6Z" fill="#4f46e5" />
+      {/* The A, and the lighter stroke that sweeps across it. */}
+      <path d="M16 3.5 4.6 28h5.6l2.2-5.2h7.2L21.8 28h5.6L16 3.5Zm0 9.9 2.3 5.2h-4.6L16 13.4Z" fill="#1668e0" />
+      <path d="M6.5 13.5C12 9 20 8.2 26.5 11.4" stroke="#6ea8f5" strokeWidth="2.1" strokeLinecap="round" />
     </svg>
   );
 }
 
 export function Wordmark() {
   return (
-    <span className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+    <span className="flex items-center gap-2.5 text-[17px] font-bold tracking-tight text-stone-900">
       <LogoMark />
       The AI Apprentice
     </span>
@@ -26,30 +30,44 @@ const LINKS = [
   { href: "/teach", label: "Teach" },
 ];
 
-// Top bar for every page except the sandbox, which stands in for the
+// Top bar for every page except the sandbox ERP, which stands in for the
 // customer's own system and must not look like part of this app.
 export function SiteHeader() {
   const pathname = usePathname();
-  if (pathname.startsWith("/erp") || pathname.startsWith("/hiring")) return null;
+  const personName = usePersonName();
+  if (pathname.startsWith("/erp")) return null;
+  // The capture flow is a focused task: the bar carries only the wordmark and
+  // who is recording, as in the design.
+  const focused = pathname.startsWith("/capture");
+
   return (
-    <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#faf9f7]/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5">
+    <header className="sticky top-0 z-30 border-b border-stone-200 bg-white">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
         <Link href="/" aria-label="The AI Apprentice, home">
           <Wordmark />
         </Link>
-        <nav className="hidden items-center gap-7 text-xs font-medium text-stone-500 sm:flex">
-          {LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className="hover:text-stone-900">
-              {l.label}
+        {!focused && (
+          <nav className="hidden items-center gap-7 text-sm font-medium text-stone-500 sm:flex">
+            {LINKS.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-stone-900">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+        <div className="flex items-center gap-4">
+          {!focused && (
+            <Link
+              href="/capture"
+              className="rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:border-stone-300"
+            >
+              Start capturing
             </Link>
-          ))}
-        </nav>
-        <Link
-          href="/capture"
-          className="rounded-lg border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-900 shadow-sm hover:border-stone-300"
-        >
-          Start capturing
-        </Link>
+          )}
+          <span title={personName ?? undefined}>
+            <Avatar name={personName ?? DEFAULT_PERSON_NAME} size={36} />
+          </span>
+        </div>
       </div>
     </header>
   );
