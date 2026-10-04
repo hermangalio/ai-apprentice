@@ -16,15 +16,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   return Response.json(Number.isFinite(since) && since > 0 ? all.filter((e) => e.t > since) : all);
 }
 
-// Personal data in string facts (for example a supplier that is a private
-// person's email address) is masked the same way as transcript text.
+// Personal data in string facts (for example an email address or a phone
+// number in a contact field) is masked the same way as transcript text.
 function redactFacts(facts: CaseFacts): CaseFacts {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(facts)) out[k] = typeof v === "string" ? redact(v) : v;
   return out as CaseFacts;
 }
 
-// Accepts one DOM event or an array of them from the sandbox ERP. The server
+// Accepts one DOM event or an array of them from the sandbox. The server
 // assigns id and t (from `wallTime` when present), masks personal data in
 // summary, before, after and facts, and attaches a frame. A frame stored
 // shortly after the event replaces that link (relinkDomEvents in vision.ts).

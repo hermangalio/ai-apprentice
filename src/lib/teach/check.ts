@@ -150,7 +150,7 @@ function asNumber(v: Value): number | null {
 function equal(a: Value, b: Value): boolean {
   if (empty(a) || empty(b)) return empty(a) && empty(b);
   // A number compared with a string compares numerically; two strings stay
-  // strings, so cost center "0400" is not equal to "400".
+  // strings, so a code "007" is not equal to "7".
   if (typeof a === "number" || typeof b === "number") {
     const x = asNumber(a);
     const y = asNumber(b);
@@ -246,85 +246,217 @@ export type CheckResult = {
   undecided: Guardrail[];
   // The facts the check ran on (event facts merged over earlier ones).
   facts: CaseFacts;
-  invoiceId?: string;
+  // The case the event is about: "C-110" and "candidate".
+  caseId?: string;
+  caseType: string;
   // Set when the event was ignored, with the reason.
   skipped?: string;
 };
 
-// Actions that park the case without booking it. A wrong field value is not
-// yet a problem when one of these is pressed.
-const NON_POSTING_ACTIONS = new Set(["hold", "cancel", "close", "back"]);
+// Actions that neither move the case forward nor decide it. They are not
+// judged against the guardrails. These are navigation words, not workflow words.
+const NEUTRAL_ACTIONS = new Set(["cancel", "close", "back", "reopen"]);
 
-export function invoiceIdOf(e: ScreenEvent): string | undefined {
-  return e.facts?.invoice_id ?? (e.entity?.type === "invoice" ? e.entity.id : undefined);
+const words = (key: string) => key.replace(/_/g, " ");
+
+// The fact that names the case when the event has no entity: the first key
+// that ends in "_id" ("candidate_id", "order_id", ...).
+function idFact(facts?: CaseFacts): { type: string; id: string } | undefined {
+  for (const [k, v] of Object.entries(facts ?? {})) {
+    if (/_id$/.test(k) && v !== undefined && v !== "" && typeof v !== "boolean") {
+      return { type: words(k.slice(0, -3)), id: String(v) };
+    }
+  }
+  return undefined;
 }
 
-// Latest known facts for the event's invoice: earlier events first, the event
+export function caseIdOf(e: Pick<ScreenEvent, "entity" | "facts">): string | undefined {
+  return e.entity?.id ?? idFact(e.facts)?.id;
+}
+
+// "candidate", "order", ... or "case" when the event does not say.
+export function caseTypeOf(e: Pick<ScreenEvent, "entity" | "facts">): string {
+  return e.entity?.type ?? idFact(e.facts)?.type ?? "case";
+}
+
+// Latest known facts for the event's case: earlier events first, the event
 // itself last. DOM events carry full facts, so for them this is a no-op.
 export function mergedFacts(event: ScreenEvent, history: ScreenEvent[]): CaseFacts {
-  const id = invoiceIdOf(event);
+  const id = caseIdOf(event);
   let facts: CaseFacts = {};
   if (id) {
     for (const h of history) {
-      if (h.id !== event.id && h.t <= event.t && invoiceIdOf(h) === id && h.facts) facts = { ...facts, ...h.facts };
+      if (h.id !== event.id && h.t <= event.t && caseIdOf(h) === id && h.facts) facts = { ...facts, ...h.facts };
     }
   }
   return { ...facts, ...(event.facts ?? {}) };
 }
 
 // Whether guardrails the rules left undecided are worth a model call for this
-// event. Only the two moments where a late answer is still useful: an invoice
-// was just opened, or an action waits in the confirmation step. Field changes
-// and committed actions are left to the rules.
+// event. Only the two moments where a late answer is still useful: a case was
+// just opened, or an action waits in the confirmation step. Field changes and
+// committed actions are left to the rules.
 export function wantsModelCheck(e: Pick<ScreenEvent, "kind" | "action" | "committed" | "entity" | "facts">): boolean {
-  if (e.kind === "open") return Boolean(e.facts?.invoice_id ?? (e.entity?.type === "invoice" ? e.entity.id : undefined));
+  if (e.kind === "open") return Boolean(caseIdOf(e));
   return e.kind === "action" && Boolean(e.action) && e.committed !== true;
 }
 
-const eur = (n: number) => `EUR ${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-
-export function describeCase(f: CaseFacts): string {
-  const parts: string[] = [];
-  if (f.amount !== undefined) parts.push(eur(f.amount));
-  if (f.category) parts.push(f.category);
-  let s = `invoice${f.invoice_id ? ` ${f.invoice_id}` : ""}`;
-  if (parts.length) s += ` (${parts.join(", ")})`;
-  if (f.supplier) s += ` from ${f.supplier}`;
-  return s;
+// The fact names the Work Map's guardrails look at.
+export function factNames(workMap: Pick<WorkMap, "guardrails">): string[] {
+  const out = new Set<string>();
+  for (const g of workMap.guardrails) {
+    for (const expr of [g.check?.when, g.check?.require, g.check?.forbid]) {
+      if (!expr) continue;
+      try {
+        for (const id of identifiers(expr)) if (id !== "action") out.add(id);
+      } catch {
+        // A check that does not parse names no facts.
+      }
+    }
+  }
+  return [...out];
 }
 
-const ACTION_WORDS: Record<string, string> = {
-  save: "post",
-  hold: "put on hold",
-  send_for_approval: "send for approval",
-};
-export const actionWord = (a: string) => ACTION_WORDS[a] ?? a.replace(/_/g, " ");
+// The facts of a case as short readable parts, in the order the facts come:
+// "Marco Rossi", "degree PhD", "has production ml", "track standard",
+// "no interviewer". Ids, the status, and flags that are false are left out.
+// An empty fact is only mentioned when a guardrail looks at it (`relevant`).
+export function caseParts(f: CaseFacts, relevant: readonly string[] = []): string[] {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(f)) {
+    if (k === "id" || /_id$/.test(k) || k === "status" || v === false) continue;
+    if (v === undefined || v === "") {
+      if (relevant.includes(k)) parts.push(`no ${words(k)}`);
+    } else if (v === true) parts.push(words(k));
+    else if (k === "name") parts.push(String(v));
+    else parts.push(`${words(k)} ${v}`);
+  }
+  return parts;
+}
 
-// The field the guardrail is about, for highlighting in the ERP.
+// "candidate C-110 (Marco Rossi, degree PhD, university ETH Zurich, ...)".
+export function describeCase(f: CaseFacts, opts: { type?: string; id?: string; relevant?: readonly string[] } = {}): string {
+  const found = idFact(f);
+  const type = opts.type ?? found?.type ?? "case";
+  const id = opts.id ?? found?.id;
+  const parts = caseParts(f, opts.relevant);
+  return `${id ? `${type} ${id}` : `the ${type}`}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+}
+
+// The action name as it is said, with underscores as spaces.
+export const actionWord = (a: string) => words(a);
+
+// The action names an expression compares `action` with: "action == 'hold'"
+// gives ["hold"].
+export function actionLiterals(expr: string): string[] {
+  const out = new Set<string>();
+  const walk = (n: Node) => {
+    if (n.k === "not") walk(n.a);
+    else if (n.k === "bin") {
+      if (n.op === "==") {
+        const [a, b] = n.a.k === "id" ? [n.a, n.b] : [n.b, n.a];
+        if (a.k === "id" && a.name === "action" && b.k === "lit" && typeof b.v === "string") out.add(b.v);
+      }
+      walk(n.a);
+      walk(n.b);
+    }
+  };
+  walk(ast(expr));
+  return [...out];
+}
+
+// Actions that some guardrail of the map asks for ("action == 'hold'"). They
+// hand the case to someone else instead of completing it, so a field value
+// that is still wrong is not judged when one of them is pressed.
+function handOffActions(workMap: Pick<WorkMap, "guardrails">): Set<string> {
+  const out = new Set<string>();
+  for (const g of workMap.guardrails) {
+    if (!g.check?.require) continue;
+    try {
+      for (const a of actionLiterals(g.check.require)) out.add(a);
+    } catch {
+      // Left to the model.
+    }
+  }
+  return out;
+}
+
+// The fact names a guardrail's check looks at, most specific first: what it
+// requires, what it forbids, then when it applies.
+export function guardrailFields(g: Guardrail): string[] {
+  const out: string[] = [];
+  for (const expr of [g.check?.require, g.check?.forbid, g.check?.when]) {
+    if (!expr) continue;
+    try {
+      for (const id of identifiers(expr)) if (id !== "action" && !out.includes(id)) out.push(id);
+    } catch {
+      // A check that does not parse names no fields.
+    }
+  }
+  return out;
+}
+
+// The field the guardrail is about.
 export function guardrailField(g: Guardrail): string | undefined {
-  if (!g.check) return undefined;
-  const pick = (expr?: string) => (expr ? identifiers(expr).find((i) => i !== "action") : undefined);
-  return pick(g.check.require) ?? pick(g.check.forbid) ?? pick(g.check.when);
+  return guardrailFields(g)[0];
+}
+
+const tokens = (name: string) => name.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+function related(a: string, b: string): boolean {
+  for (const x of tokens(a)) {
+    for (const y of tokens(b)) {
+      let n = 0;
+      while (n < x.length && n < y.length && x[n] === y[n]) n++;
+      if (n >= 5 || (n === x.length && n === y.length)) return true;
+    }
+  }
+  return false;
+}
+
+// The element to highlight for a guardrail, chosen from the names the
+// application on screen says it can highlight. A fact of the check with the
+// same name wins, then one with a related name ("employer_is_partner" and
+// "current_employer"), then the button of an action the check names.
+export function highlightField(g: Guardrail, available: readonly string[]): string | undefined {
+  const fields = guardrailFields(g);
+  const exact = fields.find((f) => available.includes(f));
+  if (exact) return exact;
+  for (const f of fields) {
+    const near = available.find((a) => related(f, a));
+    if (near) return near;
+  }
+  for (const expr of [g.check?.forbid, g.check?.require]) {
+    if (!expr) continue;
+    try {
+      const button = actionLiterals(expr).find((a) => available.includes(a));
+      if (button) return button;
+    } catch {
+      // Nothing to highlight.
+    }
+  }
+  return undefined;
 }
 
 export function checkEvent(workMap: WorkMap, event: ScreenEvent, history: ScreenEvent[]): CheckResult {
   const facts = mergedFacts(event, history);
-  const invoiceId = invoiceIdOf(event) ?? facts.invoice_id;
-  const result: CheckResult = { violations: [], atRisk: [], satisfied: [], undecided: [], facts, invoiceId };
+  const caseId = caseIdOf(event) ?? caseIdOf({ facts });
+  const caseType = event.entity?.type ?? caseTypeOf({ facts });
+  const result: CheckResult = { violations: [], atRisk: [], satisfied: [], undecided: [], facts, caseId, caseType };
 
-  // DOM events are ground truth. When the ERP reports this invoice itself, a
-  // late vision event about it must not trigger a second intervention.
+  // DOM events are ground truth. When the application reports this case
+  // itself, a late vision event about it must not trigger a second intervention.
   if (event.source === "vision") {
     const domCovers = history.some(
-      (h) => h.source === "dom" && h.id !== event.id && (invoiceId ? invoiceIdOf(h) === invoiceId : true),
+      (h) => h.source === "dom" && h.id !== event.id && (caseId ? caseIdOf(h) === caseId : true),
     );
-    if (domCovers) return { ...result, skipped: "dom events cover this invoice" };
+    if (domCovers) return { ...result, skipped: "dom events cover this case" };
   }
 
   // Any event that carries an action is an attempt (uncommitted) or a
-  // completed action (committed).
-  const action = event.action;
+  // completed action (committed). Neutral actions are not judged.
+  const action = event.action && !NEUTRAL_ACTIONS.has(event.action) ? event.action : undefined;
   const isAction = Boolean(action);
+  const handOff = handOffActions(workMap);
   const committed = event.committed === true;
   const severity: Severity = committed ? "broken" : "about_to_break";
 
@@ -333,7 +465,7 @@ export function checkEvent(workMap: WorkMap, event: ScreenEvent, history: Screen
   const known =
     event.source === "dom" ? undefined : new Set<string>([...Object.keys(facts), "action"]);
   const state: Scope = { ...facts, action };
-  const caseText = describeCase(facts);
+  const caseText = describeCase(facts, { type: caseType, id: caseId, relevant: factNames(workMap) });
 
   for (const g of workMap.guardrails) {
     if (!g.check) {
@@ -375,8 +507,8 @@ export function checkEvent(workMap: WorkMap, event: ScreenEvent, history: Screen
           else if (!r) {
             unmet = true;
             const field = ids[0];
-            const current = field ? `${field.replace(/_/g, " ")} ${String(state[field] ?? "empty")}` : "the current values";
-            if (isAction && !NON_POSTING_ACTIONS.has(action!)) {
+            const current = field ? `${words(field)} ${String(state[field] ?? "") || "empty"}` : "the current values";
+            if (isAction && !handOff.has(action!)) {
               violated = true;
               what = committed
                 ? `The learner chose to ${actionWord(action!)} ${caseText} with ${current}.`
@@ -400,10 +532,13 @@ export function checkEvent(workMap: WorkMap, event: ScreenEvent, history: Screen
               : `The learner is about to ${actionWord(action!)} ${caseText}.`;
           }
         } else {
-          // Would the forbidden condition hold if the learner posted now?
-          const f = evaluate(g.check.forbid, { ...state, action: "save" }, known);
-          if (f === UNKNOWN) unknown = true;
-          else if (f) unmet = true;
+          // Would the forbidden condition hold if the learner now pressed an
+          // action the rule names?
+          const named = actionLiterals(g.check.forbid);
+          const tries = named.length ? named.map((a) => ({ ...state, action: a })) : [state];
+          const outcomes = tries.map((s) => evaluate(g.check!.forbid!, s, known));
+          if (outcomes.includes(true)) unmet = true;
+          else if (outcomes.includes(UNKNOWN)) unknown = true;
         }
       }
     } catch {

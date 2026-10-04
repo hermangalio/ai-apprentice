@@ -111,7 +111,7 @@ export function useScreenCapture({ sessionId }: { sessionId: string | null | und
     };
   }, [sessionId, addEvents]);
 
-  // DOM events from the sandbox ERP, only while the screen is shared: nothing
+  // DOM events from the sandbox, only while the screen is shared: nothing
   // is logged before the person has started sharing or after they stopped.
   // Every message counts as activity; real events are forwarded to the
   // server, typing pings are not stored.

@@ -4,111 +4,111 @@
     "t": 40000,
     "speaker": "expert",
     "phase": "capture",
-    "text": "Okay, first one, Kessler, tool holders. I always check it against the purchase order first."
+    "text": "Okay, first one. Nina, ML engineer. I always look at the work history before anything else."
   },
   {
     "id": "tr_02",
     "t": 195000,
     "speaker": "agent",
     "phase": "capture",
-    "text": "You moved that one to capex. What made you do that?"
+    "text": "You moved her to the fast track. What made you do that?"
   },
   {
     "id": "tr_03",
     "t": 201000,
     "speaker": "expert",
     "phase": "capture",
-    "text": "Equipment over 5,000 euros is always capex. It doesn't matter what the default code says."
+    "text": "Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says."
   },
   {
     "id": "tr_04",
     "t": 240000,
     "speaker": "agent",
     "phase": "capture",
-    "text": "You typed an asset number before posting. Is there a case where you would post capex without one?"
+    "text": "You assigned an interviewer before advancing her. Would you ever fast-track someone without one?"
   },
   {
     "id": "tr_05",
     "t": 247000,
     "speaker": "expert",
     "phase": "capture",
-    "text": "Never. No asset number, no capex booking. If it's missing I ask asset accounting to create one first."
+    "text": "Never. No interviewer, no fast track. If nobody is free I ask Reto who takes it first."
   },
   {
     "id": "tr_06",
     "t": 326000,
     "speaker": "agent",
     "phase": "capture",
-    "text": "You put the Brandt invoice on hold instead of posting it. Why?"
+    "text": "You put Jonas on hold instead of advancing him. Why?"
   },
   {
     "id": "tr_07",
     "t": 333000,
     "speaker": "expert",
     "phase": "capture",
-    "text": "Brandt double-bills every December. Same amount as one we already paid, so it waits until I've checked it."
+    "text": "He's from UZH. UZH applications wait."
   },
   {
     "id": "tr_08",
     "t": 421000,
     "speaker": "expert",
     "phase": "capture",
-    "text": "And this one is from our Czech subsidiary, so it goes for a second approval."
+    "text": "And this one was referred by Luca, so it goes to the founders."
   },
   {
     "id": "tr_09",
     "t": 455000,
     "speaker": "agent",
     "phase": "debrief",
-    "text": "You held the December invoice. Is that for every supplier, and who decides when to release it?"
+    "text": "You held the UZH application. Is that for every university, and who decides when it moves?"
   },
   {
     "id": "tr_10",
     "t": 463000,
     "speaker": "expert",
     "phase": "debrief",
-    "text": "Only Brandt, and only in December. Herr Vogel, the controller, releases it once Brandt confirms it isn't a duplicate."
+    "text": "Only UZH. Reto, our CTO, looks at those himself once he has had his coffee. He decides, not me."
   },
   {
     "id": "tr_11",
     "t": 474000,
     "speaker": "agent",
     "phase": "debrief",
-    "text": "Why does the Czech subsidiary need a second approval?"
+    "text": "Why does a referral go to the founders?"
   },
   {
     "id": "tr_12",
     "t": 481000,
     "speaker": "expert",
     "phase": "debrief",
-    "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule."
+    "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule."
   },
   {
     "id": "tr_13",
     "t": 490000,
     "speaker": "agent",
     "phase": "debrief",
-    "text": "What do you do when the supplier is one you have never seen before?"
+    "text": "What do you do when the applicant currently works for one of your investors or customers?"
   },
   {
     "id": "tr_14",
     "t": 497000,
     "speaker": "expert",
     "phase": "debrief",
-    "text": "I stop and ask the controller. I never post an invoice from an unknown supplier myself."
+    "text": "I stop and ask the CEO. I never advance someone from an investor or a customer myself."
   },
   {
     "id": "tr_15",
     "t": 506000,
     "speaker": "agent",
     "phase": "debrief",
-    "text": "Let me say it back. You match each invoice to its purchase order. Equipment over 5,000 euros goes to capex 0400 and needs an asset number before posting. Brandt invoices in December are held until the controller releases them. Group company invoices go for a second approval, and unknown suppliers go to the controller. Invoices over 5,000 euros also need a second approval. Is that right?"
+    "text": "Let me say it back. You check the work history first. Three or more years of production machine learning goes to the fast track, and needs an interviewer before you advance. UZH applications are held until Reto decides. Referrals from employees go to the founders, and applicants from an investor or customer go to the CEO. Candidates asking for a high salary also go to the founders. Is that right?"
   },
   {
     "id": "tr_16",
     "t": 531000,
     "speaker": "expert",
     "phase": "debrief",
-    "text": "Almost. The second approval isn't about the amount, it's only for group companies. The rest is right."
+    "text": "Almost. The founders step isn't about salary, it's only for referrals. The rest is right."
   }
 ]

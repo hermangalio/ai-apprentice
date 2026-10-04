@@ -128,28 +128,21 @@ export function resolveMoment(
   return null;
 }
 
-const FACT_FIELDS = new Set([
-  "invoice_id",
-  "supplier",
-  "supplier_known",
-  "supplier_is_group_company",
-  "amount",
-  "category",
-  "invoice_month",
-  "cost_center",
-  "asset_number",
-  "status",
-  // Not a CaseFacts field: the action the person is about to take.
-  "action",
-  "true",
-  "false",
-]);
+// Names a check may use besides the fact keys of the session: the action the
+// person is about to take, and the boolean literals.
+const ALWAYS_ALLOWED = new Set(["action", "true", "false"]);
 
 const TOKEN = /\s+|'[^']*'|"[^"]*"|\d+(?:\.\d+)?|[A-Za-z_]\w*|==|!=|>=|<=|&&|\|\||[!<>()]/y;
 
-// True if the expression only uses known fields, literals and comparison or
-// boolean operators.
-export function isValidExpr(expr: unknown): expr is string {
+// The fact keys seen in a session's events: what a check can be evaluated against.
+export function factKeysOf(events: ScreenEvent[]): Set<string> {
+  return new Set(events.flatMap((e) => Object.keys(e.facts ?? {})));
+}
+
+// True if the expression only uses literals, comparison or boolean operators
+// and names from `fields` (the fact keys of the session). Without `fields`
+// any identifier is accepted and only the syntax is checked.
+export function isValidExpr(expr: unknown, fields?: Set<string>): expr is string {
   if (typeof expr !== "string" || !expr.trim()) return false;
   TOKEN.lastIndex = 0;
   let pos = 0;
@@ -157,20 +150,20 @@ export function isValidExpr(expr: unknown): expr is string {
     TOKEN.lastIndex = pos;
     const m = TOKEN.exec(expr);
     if (!m || m[0].length === 0) return false;
-    if (/^[A-Za-z_]/.test(m[0]) && !FACT_FIELDS.has(m[0])) return false;
+    if (fields && /^[A-Za-z_]/.test(m[0]) && !ALWAYS_ALLOWED.has(m[0]) && !fields.has(m[0])) return false;
     pos += m[0].length;
   }
   return true;
 }
 
-// Keeps a check only when it is fully expressible over CaseFacts. The plain
-// language rule stays the source of truth either way.
-export function cleanCheck(raw: unknown): GuardrailCheck | undefined {
+// Keeps a check only when it is fully expressible over the case facts of the
+// session. The plain language rule stays the source of truth either way.
+export function cleanCheck(raw: unknown, fields?: Set<string>): GuardrailCheck | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
-  if (!isValidExpr(r.when)) return undefined;
-  const require = isValidExpr(r.require) ? r.require : undefined;
-  const forbid = isValidExpr(r.forbid) ? r.forbid : undefined;
+  if (!isValidExpr(r.when, fields)) return undefined;
+  const require = isValidExpr(r.require, fields) ? r.require : undefined;
+  const forbid = isValidExpr(r.forbid, fields) ? r.forbid : undefined;
   if (!require && !forbid) return undefined;
   // A clause the model wrote but that does not parse makes the whole check unreliable.
   if ((r.require && !require) || (r.forbid && !forbid)) return undefined;

@@ -15,8 +15,8 @@ import type { Session } from "@/lib/types";
 // Map and moves on to the debrief.
 export default function CapturePage() {
   const [session, setSession] = useState<Session | null>(null);
-  const [personName, setPersonName] = useState("Sabine");
-  const [task, setTask] = useState("Process supplier invoices before month-end close");
+  const [personName, setPersonName] = useState("Emilie");
+  const [task, setTask] = useState("Screen applications for the ML engineer role");
   const [error, setError] = useState<string | null>(null);
 
   const create = async () => {
@@ -49,8 +49,8 @@ export default function CapturePage() {
         <button type="button" disabled={!personName || !task} onClick={() => void create()} className="rounded bg-stone-900 px-4 py-2 text-white disabled:opacity-40">
           Start session
         </button>
-        <a href="/erp?set=expert" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
-          Open the sandbox ERP
+        <a href="/hiring?set=expert" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
+          Open the hiring desk sandbox
         </a>
       </div>
       {error && <p className="text-sm text-red-700">{error}</p>}
@@ -112,8 +112,8 @@ function CaptureSession({ session }: { session: Session }) {
         <h1 className="text-xl font-semibold">
           {session.personName}: {session.task}
         </h1>
-        <a href="/erp?set=expert" target="_blank" rel="noreferrer" className="text-sm underline">
-          Open the sandbox ERP
+        <a href="/hiring?set=expert" target="_blank" rel="noreferrer" className="text-sm underline">
+          Open the hiring desk sandbox
         </a>
       </header>
 

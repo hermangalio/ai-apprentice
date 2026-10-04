@@ -1,10 +1,11 @@
 import type { CaseFacts, Intervention, Prediction, Scorecard, ScreenEvent, WorkMap } from "../types";
-import { checkEvent, invoiceIdOf } from "./check";
+import { caseIdOf, caseTypeOf, checkEvent } from "./check";
 
 // Where the learner is in the process, and the end-of-session scorecard.
 // Pure functions over the Work Map and the learner's events.
 
 const byTime = (events: ScreenEvent[]) => [...events].sort((a, b) => a.t - b.t);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const signature = (e: ScreenEvent) => `${e.kind}|${e.field ?? ""}|${e.action ?? ""}`;
 
 // The step a learner event belongs to: the first step (in order) in which the
@@ -28,9 +29,10 @@ export type StepProgress = {
 };
 
 export type Progress = {
-  invoiceId?: string;
+  caseId?: string;
+  caseType: string; // "candidate", or "case" when the events do not say
   facts: CaseFacts;
-  closed: boolean; // the current invoice has been posted, held or sent on
+  closed: boolean; // an action on the current case has been confirmed
   steps: StepProgress[];
   currentStepId?: string;
   atRiskIds: string[];
@@ -40,14 +42,14 @@ export function computeProgress(
   workMap: WorkMap,
   expertEvents: ScreenEvent[],
   learnerEvents: ScreenEvent[],
-  interventions: (Intervention & { invoiceId?: string })[],
+  interventions: (Intervention & { caseId?: string })[],
   predictions: Prediction[],
 ): Progress {
   const events = byTime(learnerEvents);
-  const withInvoice = events.filter((e) => invoiceIdOf(e));
-  const latest = withInvoice[withInvoice.length - 1];
-  const invoiceId = latest ? invoiceIdOf(latest) : undefined;
-  const mine = invoiceId ? events.filter((e) => invoiceIdOf(e) === invoiceId) : [];
+  const withCase = events.filter((e) => caseIdOf(e));
+  const latest = withCase[withCase.length - 1];
+  const caseId = latest ? caseIdOf(latest) : undefined;
+  const mine = caseId ? events.filter((e) => caseIdOf(e) === caseId) : [];
 
   const done = new Set<string>();
   let closed = false;
@@ -63,7 +65,7 @@ export function computeProgress(
   const check = latest ? checkEvent(workMap, latest, events.filter((e) => e.t <= latest.t)) : null;
   const atRisk = closed || !check ? [] : check.atRisk;
   const intervened = new Set(
-    interventions.filter((i) => !invoiceId || i.invoiceId === invoiceId).map((i) => i.guardrailId),
+    interventions.filter((i) => !caseId || i.caseId === caseId).map((i) => i.guardrailId),
   );
   const predicted = new Set(predictions.map((p) => p.stepId));
 
@@ -84,7 +86,8 @@ export function computeProgress(
   }));
 
   return {
-    invoiceId,
+    caseId,
+    caseType: check?.caseType ?? (latest ? caseTypeOf(latest) : "case"),
     facts: check?.facts ?? {},
     closed,
     steps,
@@ -102,9 +105,9 @@ export type ScoreItem = {
   quote?: string;
 };
 
-type Situation = { invoiceId: string; result: "open" | "clean" | "broken"; intervened: boolean };
+type Situation = { caseId: string; label: string; result: "open" | "clean" | "broken"; intervened: boolean };
 
-export function computeScorecard<I extends Intervention & { invoiceId?: string; severity?: string }>(
+export function computeScorecard<I extends Intervention & { caseId?: string; severity?: string }>(
   workMap: WorkMap,
   learnerEvents: ScreenEvent[],
   interventions: I[],
@@ -112,22 +115,22 @@ export function computeScorecard<I extends Intervention & { invoiceId?: string; 
   sessionId: string,
 ): { scorecard: Scorecard; items: ScoreItem[]; interventions: I[] } {
   const events = byTime(learnerEvents);
-  const eventInvoice = new Map(events.map((e) => [e.id, invoiceIdOf(e)]));
-  const invoiceOf = (i: I) => i.invoiceId ?? eventInvoice.get(i.learnerEventId);
+  const eventCase = new Map(events.map((e) => [e.id, caseIdOf(e)]));
+  const caseOf = (i: I) => i.caseId ?? eventCase.get(i.learnerEventId);
 
-  // Every (guardrail, invoice) pair in which the guardrail applied.
+  // Every (guardrail, case) pair in which the guardrail applied.
   const situations = new Map<string, Situation[]>();
   events.forEach((e, idx) => {
     const res = checkEvent(workMap, e, events.slice(0, idx));
-    if (res.skipped || !res.invoiceId) return;
+    if (res.skipped || !res.caseId) return;
     const touch = (gid: string) => {
       const list = situations.get(gid) ?? [];
       if (!situations.has(gid)) situations.set(gid, list);
-      let s = list.find((x) => x.invoiceId === res.invoiceId);
-      if (!s) list.push((s = { invoiceId: res.invoiceId!, result: "open", intervened: false }));
+      let s = list.find((x) => x.caseId === res.caseId);
+      if (!s) list.push((s = { caseId: res.caseId!, label: `${res.caseType} ${res.caseId}`, result: "open", intervened: false }));
       return s;
     };
-    const closing = e.kind === "action" && e.committed === true;
+    const closing = e.kind === "action" && e.committed === true && e.action !== "reopen";
     for (const g of res.atRisk) touch(g.id);
     for (const g of res.satisfied) {
       const s = touch(g.id);
@@ -139,14 +142,14 @@ export function computeScorecard<I extends Intervention & { invoiceId?: string; 
     }
   });
   for (const i of interventions) {
-    const s = situations.get(i.guardrailId)?.find((x) => x.invoiceId === invoiceOf(i));
+    const s = situations.get(i.guardrailId)?.find((x) => x.caseId === caseOf(i));
     if (s && i.severity !== "broken") s.intervened = true;
   }
 
   // Fill in outcomes the voice agent did not log.
   const resolved = interventions.map((i) => {
     if (i.outcome) return i;
-    const s = situations.get(i.guardrailId)?.find((x) => x.invoiceId === invoiceOf(i));
+    const s = situations.get(i.guardrailId)?.find((x) => x.caseId === caseOf(i));
     if (s?.result === "broken") return { ...i, outcome: "overridden" as const };
     if (s?.result === "clean") return { ...i, outcome: "corrected" as const };
     return i;
@@ -163,19 +166,19 @@ export function computeScorecard<I extends Intervention & { invoiceId?: string; 
     let note = "Did not come up in this session.";
     if (last?.result === "broken") {
       status = "practice";
-      note = `Invoice ${last.invoiceId} was saved against this rule.`;
+      note = `${cap(last.label)} was confirmed against this rule.`;
     } else if (last?.result === "clean" && last.intervened) {
       status = "practice";
-      note = `Caught before saving on invoice ${last.invoiceId}, then corrected. Not yet done without help.`;
+      note = `Caught before confirming on ${last.label}, then corrected. Not yet done without help.`;
     } else if (last?.result === "clean") {
       status = "mastered";
-      note = `Handled on invoice ${last.invoiceId} without help.`;
+      note = `Handled on ${last.label} without help.`;
     } else if (logged.length > 0) {
       status = "practice";
       const o = logged[logged.length - 1].outcome;
       note = o === "corrected" ? "Corrected after the tutor stepped in." : o === "overridden" ? "Went ahead against the rule." : "The tutor stepped in; the case is still open.";
     } else if (list.length > 0) {
-      note = `Came up on invoice ${list[list.length - 1].invoiceId}; the case is still open.`;
+      note = `Came up on ${list[list.length - 1].label}; the case is still open.`;
     }
     items.push({ id: g.id, kind: "guardrail", label: g.rule, status, note, quote: `${who}: "${g.quote.text}"` });
   }

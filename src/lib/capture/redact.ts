@@ -1,5 +1,5 @@
 // PII redaction for transcript text. Dependency-free and deliberately
-// conservative: invoice numbers, amounts, cost centers and dates must survive.
+// conservative: record numbers, amounts, codes and dates must survive.
 
 export type RedactionCounts = { email: number; iban: number; card: number; phone: number };
 

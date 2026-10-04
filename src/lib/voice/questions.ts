@@ -1,7 +1,7 @@
 import { warmSession } from "../llm";
 import { newId } from "../store";
 import type { Question, QuestionKind, ScreenEvent, TranscriptItem } from "../types";
-import { canonicalEventIds, decisionKey, normalizeAction } from "../capture/dedupe";
+import { actionClass, canonicalEventIds, decisionKey } from "../capture/dedupe";
 import { MAX_EVENT_AGE_MS, MAX_QUESTIONS_PER_WINDOW, QUESTION_WINDOW_MS, minGapAfter } from "./pause";
 
 // Server-only. Decides which single question the interviewer should ask now.
@@ -49,19 +49,19 @@ export type NextQuestionResult = {
 // A guardrail question must be among the first this many live questions.
 export const GUARDRAIL_WITHIN_FIRST = 3;
 
-const JUDGMENT_ACTIONS = /hold|approv|reject|rerout|escalat|return|block|stop|forward|flag|dispute|defer|split/i;
+// Actions that take a case off its normal path, in any workflow.
+const DIVERTING = /hold|held|reject|declin|rerout|escalat|return|block|stop|forward|refer|flag|dispute|defer|split|sen[dt][ _](it[ _])?(to|for|back)/i;
 // An action that was only requested (the confirmation box is open) or was
 // cancelled is not a decision yet. The committed action is the decision.
 const UNCOMMITTED = /requested|confirmation (open|shown)|cancelled|canceled/i;
 
-// Events that look like a decision instead of routine navigation.
+const sameText = (a: string | undefined, b: string | undefined) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+
+// Events that are a decision instead of routine navigation: a committed
+// action, or a field that was moved away from the value it had.
 export function isJudgmentEvent(e: ScreenEvent) {
-  if (e.kind === "field_change") return true;
-  if (e.kind === "action") {
-    if (e.committed === false || UNCOMMITTED.test(e.summary)) return false;
-    const what = `${e.action ?? ""} ${e.summary}`;
-    return JUDGMENT_ACTIONS.test(what);
-  }
+  if (e.kind === "field_change") return e.after !== undefined && e.after !== "" && !sameText(e.before, e.after);
+  if (e.kind === "action") return e.committed !== false && !UNCOMMITTED.test(e.summary) && actionClass(e.action, e.summary) !== "reopen";
   return false;
 }
 
@@ -72,7 +72,15 @@ export function decisionEvents(events: ScreenEvent[]): ScreenEvent[] {
   const canon = canonicalEventIds(events);
   const seen = new Set<string>();
   const out: ScreenEvent[] = [];
+  // The value each field started with, per case: the default.
+  const startValue = new Map<string, string>();
   for (const e of [...events].sort((a, b) => a.t - b.t)) {
+    if (e.kind === "field_change" && e.before !== undefined) {
+      const key = decisionKey(e);
+      if (!startValue.has(key)) startValue.set(key, e.before);
+      // Back to the default is not a decision.
+      else if (sameText(startValue.get(key), e.after)) continue;
+    }
     if (!isJudgmentEvent(e) || canon.get(e.id) !== e.id) continue;
     const key = decisionKey(e);
     if (seen.has(key)) continue;
@@ -97,17 +105,17 @@ function decisionIndex(events: ScreenEvent[]) {
 const SYSTEM = `You help an apprentice who watches an expert do screen work and may ask a few short spoken questions.
 You receive the screen events so far, everything said so far, and the questions that already exist.
 
-Find the judgment calls: moments where the expert overrode a default value, held something back, rerouted or escalated it, stopped, or did an extra step that a newcomer would not know to do. Routine steps (opening the next item, opening a document to read it, a normal save) are not judgment calls.
+Find the judgment calls: moments where the expert overrode a default value, held something back, rerouted or escalated it, stopped, or did an extra step that a newcomer would not know to do. Routine steps (opening the next item, opening a document to read it, the normal action that moves an ordinary case along) are not judgment calls, unless the expert did something unusual to get there.
 
 For each judgment call that has no question yet, write up to two candidate questions:
-- kind "reason": why they did it. Example: "You moved that one to capex. What made you do that?"
-- kind "guardrail": the limit or the stop-and-ask rule behind it. Examples: "Is there a case where you would post capex without an asset number?", "Is there an amount above which you would not decide this yourself?", "When would you stop here and ask someone?"
+- kind "reason": why they did it. Example: "You changed that one from normal to urgent. What made you do that?"
+- kind "guardrail": the limit or the stop-and-ask rule behind it. Examples: "Would you ever send one on without filling that in?", "Is there a limit above which you would not decide this yourself?", "When would you stop here and ask someone?"
 Use kind "exception" only for a case that was not seen at all.
 
 Rules for a question:
-- One short spoken sentence, two at most. Start from what was visible ("You put the Brandt invoice on hold.") and then ask. Plain words, no ids unless needed to point at the thing.
-- Never ask what the screen already answers (which value, which supplier, what amount).
-- Set "explained": true only when the expert has already said that reason or that rule aloud, and copy the words that say it into "explainedBy", exactly as they appear under "Said so far". A reason given aloud does not explain the guardrail: a guardrail question is explained only when the expert stated the limit, the condition or who to ask ("over five thousand", "always", "never without", "I ask the controller"). Naming the category ("that is capex equipment") is a reason, not a limit.
+- One short spoken sentence, two at most. Start from what was visible ("You put that request on hold.") and then ask. Plain words, the way a colleague would point at it: a name or "that one", not an id, unless the id is needed to tell things apart. Use the words of this session's screen events, not the wording of the examples above.
+- Never ask what the screen already answers (which value, which name, what number).
+- Set "explained": true only when the expert has already said that reason or that rule aloud, and copy the words that say it into "explainedBy", exactly as they appear under "Said so far". A reason given aloud does not explain the guardrail: a guardrail question is explained only when the expert stated the limit, the condition or who to ask ("three years or more", "over a thousand", "always", "never without", "I ask my manager"). Describing the case ("that one is urgent") is a reason, not a limit.
 - Tie each question to the eventIds it is about, using the ids from the list of decisions.
 - At most one "reason" and one "guardrail" question per decision.
 
@@ -120,7 +128,7 @@ const fmtT = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms /
 
 function buildPrompt(input: NextQuestionInput) {
   const events = input.events
-    .map((e) => `${e.id} [${fmtT(e.t)}] ${e.kind}${e.action ? `/${e.action}` : ""}: ${e.summary}`)
+    .map((e) => `${e.id} [${fmtT(e.t)}] ${e.kind}${e.action ? `/${e.action}${e.committed === false ? " (not confirmed yet)" : ""}` : ""}: ${e.summary}`)
     .join("\n");
   const said = input.transcript
     .map((x) => `[${fmtT(x.t)}] ${x.speaker}: ${x.text}`)
@@ -134,6 +142,8 @@ function buildPrompt(input: NextQuestionInput) {
 Screen events:
 ${events || "(none)"}
 
+The case on screen: ${caseLine(input.events)}
+
 Decisions (events that changed a value or routed the item somewhere else; cover each of these, either with questions or, if a question for it exists, not at all): ${likely || "(none)"}
 
 Said so far:
@@ -141,6 +151,14 @@ ${said || "(nothing)"}
 
 Existing questions:
 ${existing || "(none)"}`;
+}
+
+// The facts of the newest case, so questions can use its name and so the
+// model can see what the screen already answers.
+function caseLine(events: ScreenEvent[]) {
+  const last = [...events].reverse().find((e) => e.facts && Object.keys(e.facts).length > 0);
+  if (!last?.facts) return "(no facts read)";
+  return `${last.entity ? `${last.entity.type} ${last.entity.id} ` : ""}${JSON.stringify(last.facts)}`;
 }
 
 type LLMOut = {
@@ -155,7 +173,7 @@ const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").tr
 // Words that state a limit, a condition or an escalation. A guardrail
 // question only counts as explained when the quoted words contain one.
 const STATES_LIMIT =
-  /\d|\b(over|above|below|under|more than|less than|at least|at most|up to|limit|threshold|always|never|only|unless|except|every|whenever|must|has to|have to|need(s)? to|not allowed|ask|approval|approve[sd]?|sign[- ]?off|controller|manager|supervisor|boss)\b/i;
+  /\d|\b(over|above|below|under|more than|less than|at least|at most|up to|limit|threshold|always|never|only|unless|except|every|whenever|must|has to|have to|need(s)? to|not allowed|ask|or more|or less|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|approval|approve[sd]?|sign[- ]?off|decides?|manager|supervisor|boss)\b/i;
 
 // "Explained" is believed only with the expert's own words behind it: the
 // quote has to be in the transcript, and for a guardrail question it has to
@@ -195,69 +213,106 @@ const spoken = (text: string) =>
     .trim();
 
 // 2: the expert overrode a default, held, rerouted or stopped. 1: filled in
-// something extra. 0: routine.
+// something extra, or took the normal action. 0: routine.
 export function judgmentWeight(e: ScreenEvent) {
-  if (e.kind === "action") return isJudgmentEvent(e) ? 2 : 0;
-  if (e.kind === "field_change") return e.before && e.after && e.before !== e.after ? 2 : 1;
-  return 0;
+  if (!isJudgmentEvent(e)) return 0;
+  if (e.kind === "action") return DIVERTING.test(`${e.action ?? ""} ${e.summary}`) ? 2 : 1;
+  return e.before ? 2 : 1;
 }
 
 const CAUSAL = /\b(because|'?cause|since|so it|so that|always|never|only if|unless|otherwise|has to|have to|must|needs? to|rule)\b/i;
 
-// How the thing is called aloud: "the Brandt invoice", "invoice 4472", "that one".
+const firstWord = (v: unknown) => (typeof v === "string" ? v.trim().split(/\s+/)[0] : "");
+
+// How the thing is called aloud: "Jonas", "the Harbour request", "order 4472", "that one".
 function thingName(e: ScreenEvent) {
-  const type = (e.entity?.type ?? (e.facts?.invoice_id ? "invoice" : "")).replace(/_/g, " ");
-  const supplier = e.facts?.supplier?.trim().split(/\s+/)[0];
-  if (type && supplier && /^\p{Lu}/u.test(supplier)) return `the ${supplier} ${type}`;
+  const type = (e.entity?.type ?? "").replace(/_/g, " ");
+  const facts = e.facts ?? {};
+  // A fact that names the case: "name", or a key that ends in "_name".
+  const nameKey = Object.keys(facts).find((k) => k === "name") ?? Object.keys(facts).find((k) => /_name$/.test(k));
+  const name = nameKey ? firstWord(facts[nameKey]) : "";
+  if (name && /^\p{Lu}/u.test(name)) return nameKey === "name" ? name : `the ${name} ${type || "one"}`;
   if (e.entity) return `${type} ${e.entity.id}`;
   return "that one";
 }
 
-const FIELD_NAMES: Record<string, string> = { cost_center: "cost center", asset_number: "asset number", note: "posting note" };
+// The label the screen shows for a value, read from the event summary:
+// "Track changed from Standard loop to Fast track" gives "Fast track" for "fast".
+function shownValue(e: ScreenEvent, which: "before" | "after") {
+  const raw = e[which] ?? "";
+  const m = e.summary.match(which === "after" ? /\b(?:to|as)\s+(.+?)\s*$/i : /\bfrom\s+(.+?)\s+to\s/i);
+  const label = m?.[1]?.replace(/[.]$/, "") ?? "";
+  return label && label.toLowerCase().includes(raw.toLowerCase().slice(0, 4)) ? label : raw;
+}
+
+// "hold" -> "put Jonas on hold"; "escalate" -> "escalated Jonas".
+function actionPhrase(cls: string, label: string, thing: string) {
+  if (cls === "hold") return `put ${thing} on hold`;
+  if (cls === "escalate") return `sent ${thing} on to someone else`;
+  if (cls === "reject") return `rejected ${thing}`;
+  if (cls === "approve") return `approved ${thing}`;
+  if (cls === "advance") return `advanced ${thing}`;
+  return `chose "${label}" for ${thing}`;
+}
+
+const gerund = (verb: string) => {
+  const v = verb.split(" ")[0];
+  return `${/e$/.test(v) && !/ee$/.test(v) ? v.slice(0, -1) : v}ing`;
+};
 
 // Fallback without a model, and the fill-in for decisions the model left
-// out. One reason and one guardrail question per decision, worded as
-// something a colleague would say, never the event summary pasted in.
+// out. One reason and one guardrail question per decision, built from the
+// event itself, worded as something a colleague would say.
 export function ruleCandidates(input: NextQuestionInput): Candidate[] {
   const out: Candidate[] = [];
-  for (const e of decisionEvents(input.events)) {
+  const decisions = decisionEvents(input.events);
+  // The normal way a case leaves the desk in this session: the committed
+  // action that does not divert it, if one was seen.
+  const usual = decisions.find((e) => e.kind === "action" && judgmentWeight(e) === 1);
+  const usualVerb = usual ? (usual.action ?? actionClass(usual.action, usual.summary) ?? "").replace(/_/g, " ") : "";
+  for (const e of decisions) {
     // The expert talked about it with a causal phrase close to the event
     // (transcript times are the start of each utterance).
     const explained = input.transcript.some(
       (x) => x.speaker !== "agent" && x.t > e.t - 5_000 && x.t < e.t + 10_000 && CAUSAL.test(x.text),
     );
+    // A limit, a condition or who decides was said aloud around the event.
+    const limitStated = input.transcript.some(
+      (x) => x.speaker !== "agent" && x.t > e.t - 5_000 && x.t < e.t + 45_000 && STATES_LIMIT.test(x.text),
+    );
     const thing = thingName(e);
     const add = (kind: QuestionKind, text: string, isExplained = false) =>
       out.push({ kind, text, eventIds: [e.id], explained: isExplained });
     if (e.kind === "field_change") {
-      const field = FIELD_NAMES[e.field ?? ""] ?? (e.field ?? "that field").replace(/_/g, " ");
-      const on = thing === "that one" ? "" : ` on ${thing}`;
+      const field = (e.field ?? "that field").replace(/_/g, " ");
+      const on = thing === "that one" ? "" : ` for ${thing}`;
       if (e.before && e.after) {
-        add("reason", `You changed the ${field}${on} from ${e.before} to ${e.after}. Why?`, explained);
-        add("guardrail", `Is there a threshold, like an amount, that tells you when the ${field} has to be ${e.after}?`);
+        add("reason", `You changed the ${field}${on} from ${shownValue(e, "before")} to ${shownValue(e, "after")}. What made you do that?`, explained);
+        add("guardrail", `Is there a limit that decides when the ${field} has to be ${shownValue(e, "after")}, and when would you stop and ask someone first?`, limitStated);
       } else {
-        add("guardrail", `You filled in the ${field}${on} before going on. Is there a case where you would go ahead without it?`);
+        add("guardrail", `You set the ${field}${on} before going on. Is there a case where you would go ahead without it?`, limitStated);
       }
       continue;
     }
-    const action = normalizeAction(e.action, e.summary);
-    if (action === "hold") {
-      add("reason", `You put ${thing} on hold instead of posting it. Why?`, explained);
-      add("guardrail", `When does something like ${thing} have to go on hold, and who decides when it is released?`);
-    } else if (action === "send_for_approval") {
-      add("reason", `You sent ${thing} for a second approval instead of posting it. Why?`, explained);
-      add("guardrail", `Is there a limit above which you would not post something like ${thing} yourself?`);
+    const cls = actionClass(e.action, e.summary) ?? "that";
+    const label = (e.action ?? cls).replace(/_/g, " ");
+    // "Application C-103 escalated to the founders" read as "escalated Priya to the founders".
+    const tail = e.entity ? e.summary.split(e.entity.id)[1]?.trim().match(/^(\p{Ll}+ed|put|sent|held|set|kept)\b\s*(.*)$/u) : null;
+    const did = tail ? `${tail[1]} ${thing}${tail[2] ? ` ${tail[2].replace(/[.]$/, "")}` : ""}` : actionPhrase(cls, label, thing);
+    if (judgmentWeight(e) === 2) {
+      const instead = usualVerb && usual && decisionKey(usual) !== decisionKey(e) ? ` instead of ${gerund(usualVerb)}` : "";
+      add("reason", `You ${did}${instead}. Why?`, explained);
+      add("guardrail", `Is there a rule that decides when you do that, and who decides what happens next?`, limitStated);
     } else {
-      const label = (action ?? "that").replace(/_/g, " ");
-      add("reason", `You chose "${label}" for ${thing} instead of the usual step. Why?`, explained);
-      add("guardrail", `When is "${label}" the rule for something like ${thing}, and when would you ask someone first?`);
+      add("reason", `You ${did}. What did you check before you did that?`, explained);
+      add("guardrail", `Is there a limit that decides this, and when would you stop and ask someone first?`, limitStated);
     }
   }
   return out;
 }
 
 async function llmCandidates(input: NextQuestionInput, timeoutMs: number) {
-  const session = warmSession("voice-questions-v2", { system: SYSTEM, model: "haiku", maxCalls: 30 });
+  const session = warmSession("voice-questions-v3", { system: SYSTEM, model: "haiku", maxCalls: 30 });
   const out = await Promise.race([
     session.askJSON<LLMOut>(buildPrompt(input)),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error("question model timed out")), timeoutMs)),

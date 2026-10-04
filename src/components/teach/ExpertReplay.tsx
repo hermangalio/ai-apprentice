@@ -42,7 +42,7 @@ export function ExpertReplay({
       return [{ frame: { id: moment.frameId, t: moment.t, file: "" }, caption: moment.label, role: "moment" }];
     }
     // A neighbouring frame belongs to the replay only when it shows the same
-    // case as the moment (the next invoice being opened is not part of it).
+    // case as the moment (the next case being opened is not part of it).
     const entityOf = (f: Frame) => events.find((e) => e.frameId === f.id && e.entity)?.entity?.id;
     const here = entityOf(sorted[i]);
     const sameCase = (f: Frame) => !here || !entityOf(f) || entityOf(f) === here;

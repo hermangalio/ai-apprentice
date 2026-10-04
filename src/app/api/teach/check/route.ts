@@ -8,7 +8,7 @@ const KINDS: ScreenEventKind[] = ["open", "navigate", "field_change", "action", 
 // Checks one learner event against the Work Map's guardrails. Returns the
 // violations with the instruction text for the tutor voice agent, and stores
 // an Intervention for each new violation.
-// `event` is a ScreenEvent. A raw ERP broadcast event (no id, no t, with
+// `event` is a ScreenEvent. A raw sandbox broadcast event (no id, no t, with
 // wallTime) is accepted too. `persist: true` also appends the event to the
 // session's event list when it is not there yet (used by the verify script).
 export async function POST(req: Request) {

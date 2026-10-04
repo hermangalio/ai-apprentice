@@ -15,10 +15,10 @@ const TOOLS: Record<VoiceMode, string[]> = {
 };
 
 const SAMPLE_SPEAK: Record<VoiceMode, string> = {
-  interviewer: askInstruction("You changed the cost center from 4711 to 0400. What made you do that?"),
+  interviewer: askInstruction("You changed the track from Standard loop to Fast track. What made you do that?"),
   debrief: "Start",
   tutor:
-    "Guardrail: g_01 is about to be broken. The learner is about to save invoice 4480 (equipment, EUR 7,200) on cost center 4711.",
+    "Guardrail: g_01 is about to be broken. The learner is about to advance application C-110 (4 years of production ML) on the standard track.",
 };
 
 export function DevVoice(props: {
@@ -34,7 +34,7 @@ export function DevVoice(props: {
   const [sessionId, setSessionId] = useState("");
   const [context, setContext] = useState("");
   const [speakText, setSpeakText] = useState(SAMPLE_SPEAK.interviewer);
-  const [contextLine, setContextLine] = useState("Screen: Invoice 4471 opened (Kessler Werkzeugtechnik, EUR 6,840.00)");
+  const [contextLine, setContextLine] = useState("Screen: Application C-101 opened (MSc ETH Zurich, ML Engineer)");
   const [toolLog, setToolLog] = useState<string[]>([]);
   const [events, setEvents] = useState<ScreenEvent[]>([]);
   const [lastActivityAt, setLastActivityAt] = useState<number | null>(null);

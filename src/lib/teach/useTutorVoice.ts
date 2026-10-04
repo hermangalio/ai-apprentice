@@ -56,7 +56,7 @@ export function useTutorVoice(sessionId: string) {
         if (connected() && !timer.current) getVoice(sessionId)?.speak(instruction);
         else pending.current.set(instruction, cue);
       },
-      // The learner settled these guardrails (or the whole invoice).
+      // The learner settled these guardrails (or the whole case).
       settle(guardrailIds: string[], all: boolean) {
         pending.current.settle(guardrailIds, all);
       },

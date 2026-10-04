@@ -2,7 +2,7 @@
   {
     "id": "q_01",
     "kind": "reason",
-    "text": "You moved that one to capex. What made you do that?",
+    "text": "You moved her to the fast track. What made you do that?",
     "eventIds": [
       "evt_04"
     ],
@@ -16,7 +16,7 @@
   {
     "id": "q_02",
     "kind": "guardrail",
-    "text": "You typed an asset number before posting. Is there a case where you would post capex without one?",
+    "text": "You assigned an interviewer before advancing her. Would you ever fast-track someone without one?",
     "eventIds": [
       "evt_05"
     ],
@@ -30,7 +30,7 @@
   {
     "id": "q_03",
     "kind": "reason",
-    "text": "You put the Brandt invoice on hold instead of posting it. Why?",
+    "text": "You put Jonas on hold instead of advancing him. Why?",
     "eventIds": [
       "evt_09"
     ],
@@ -44,7 +44,7 @@
   {
     "id": "q_04",
     "kind": "guardrail",
-    "text": "You held the December invoice. Is that for every supplier, and who decides when to release it?",
+    "text": "You held the UZH application. Is that for every university, and who decides when it moves?",
     "eventIds": [
       "evt_09"
     ],
@@ -58,7 +58,7 @@
   {
     "id": "q_05",
     "kind": "reason",
-    "text": "Why does the Czech subsidiary need a second approval?",
+    "text": "Why does a referral go to the founders?",
     "eventIds": [
       "evt_11"
     ],
@@ -72,7 +72,7 @@
   {
     "id": "q_06",
     "kind": "exception",
-    "text": "What do you do when the supplier is one you have never seen before?",
+    "text": "What do you do when the applicant currently works for one of your investors or customers?",
     "eventIds": [],
     "status": "answered",
     "askedAt": 490000,

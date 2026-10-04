@@ -61,8 +61,8 @@ export default function TeachStartPage() {
         <button type="button" disabled={!expertId || !name} onClick={() => void start()} className="rounded bg-stone-900 px-4 py-2 text-white disabled:opacity-40">
           Start with the tutor
         </button>
-        <a href="/erp?set=learner" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
-          Open the sandbox ERP
+        <a href="/hiring?set=learner" target="_blank" rel="noreferrer" className="rounded border border-stone-300 px-4 py-2">
+          Open the sandbox
         </a>
       </div>
       {error && <p className="text-sm text-red-700">{error}</p>}

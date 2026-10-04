@@ -9,7 +9,7 @@ export type Session = {
   id: string;
   role: SessionRole;
   personName: string; // "Sabine", "Lena"
-  task: string; // "Process supplier invoices"
+  task: string; // "Screen applications for the ML engineer role"
   startedAt: string; // ISO
   endedAt?: string;
   // Learner sessions point at the expert session whose Work Map is being taught.
@@ -19,33 +19,27 @@ export type Session = {
 export type ScreenEventKind = "open" | "navigate" | "field_change" | "action" | "other";
 
 // The facts of the case on screen that guardrail checks are evaluated against.
-// The sandbox ERP sends them with every DOM event; for other apps the vision
-// model fills in what it can read.
-export type CaseFacts = {
-  invoice_id?: string;
-  supplier?: string;
-  supplier_known?: boolean;
-  supplier_is_group_company?: boolean;
-  amount?: number; // EUR
-  category?: string; // "equipment", "consumables", "services", ...
-  invoice_month?: number; // 1-12
-  cost_center?: string;
-  asset_number?: string;
-  status?: string; // "open", "posted", "on_hold", "awaiting_approval"
-};
+// The keys depend on the workflow; the sandbox sends them with every DOM event
+// and for other apps the vision model fills in what it can read. The hiring
+// sandbox uses: candidate_id, name, role, university, degree,
+// years_experience, has_production_ml, salary_expectation, referred_by_employee,
+// referrer, current_employer, employer_is_partner, track ("standard" | "fast" |
+// "research"), interviewer, status ("open" | "advanced" | "on_hold" |
+// "escalated" | "rejected").
+export type CaseFacts = Record<string, string | number | boolean | undefined>;
 
 export type ScreenEvent = {
   id: string;
   t: number;
   kind: ScreenEventKind;
-  // Short, concrete, past tense: "Cost center changed from 4711 to 0400".
+  // Short, concrete, past tense: "Track changed from Standard loop to Fast track".
   summary: string;
-  // What the event is about, when identifiable: { type: "invoice", id: "4471" }.
+  // What the event is about, when identifiable: { type: "candidate", id: "C-101" }.
   entity?: { type: string; id: string };
-  field?: string; // "cost_center"
+  field?: string; // "track"
   before?: string;
   after?: string;
-  // "save", "hold", "send_for_approval", ... for kind === "action".
+  // "advance", "hold", "escalate", "reject", ... for kind === "action".
   action?: string;
   // True once the change is persisted. An unsaved field_change is the window
   // in which the tutor can still step in.
@@ -91,21 +85,21 @@ export type Quote = {
   source: "live" | "debrief";
 };
 
-export type ScreenMoment = { t: number; frameId: string; label: string }; // "03:12, invoice 4471, cost center field"
+export type ScreenMoment = { t: number; frameId: string; label: string }; // "03:12, candidate C-101, track field"
 
 // A machine-checkable form of a guardrail, when one can be derived. The tutor
 // evaluates it against the learner's case; `rule` stays the source of truth.
 export type GuardrailCheck = {
-  when: string; // condition on the case, e.g. "category == 'equipment' && amount > 5000"
-  require?: string; // e.g. "cost_center == '0400'"
-  forbid?: string; // e.g. "action == 'save' && !asset_number"
+  when: string; // condition on the case, e.g. "has_production_ml && years_experience >= 3"
+  require?: string; // e.g. "track == 'fast'"
+  forbid?: string; // e.g. "action == 'advance' && !interviewer"
 };
 
 export type Guardrail = {
   id: string;
   stepId: string;
   type: "limit" | "exception" | "stop_and_ask" | "never";
-  rule: string; // "No asset number, no capex booking."
+  rule: string; // "No interviewer, no fast track."
   escalateTo?: string; // "the controller"
   check?: GuardrailCheck;
   quote: Quote;
@@ -115,9 +109,9 @@ export type Guardrail = {
 export type WorkStep = {
   id: string;
   index: number; // 1-based
-  title: string; // "Code the invoice to a cost center"
+  title: string; // "Choose the interview track"
   moment: ScreenMoment;
-  decision: string; // "Re-coded from opex (4711) to capex (0400)"
+  decision: string; // "Moved from the standard loop to the fast track"
   reason?: Quote;
   isJudgmentCall: boolean;
   guardrailIds: string[];

@@ -1,11 +1,11 @@
-// Client-side state of the sandbox ERP, persisted to localStorage.
+// Client-side state of the sandbox hiring desk, persisted to localStorage.
 // Used through useSyncExternalStore; the snapshot is null until init() ran in the browser.
 
-import { seedInvoices, type EditableFields, type ErpSet, type Invoice, type InvoiceStatus } from "./seed";
+import { seedCandidates, type EditableFields, type ErpSet, type Candidate, type CandidateStatus } from "./seed";
 
-export type ErpState = { set: ErpSet; sets: Record<ErpSet, Invoice[]> };
+export type ErpState = { set: ErpSet; sets: Record<ErpSet, Candidate[]> };
 
-const STORAGE_KEY = "erp.state.v1";
+const STORAGE_KEY = "hiring.state.v1";
 
 let state: ErpState | null = null;
 const listeners = new Set<() => void>();
@@ -14,7 +14,7 @@ function persist() {
   try {
     if (state) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Storage can be unavailable (private window). The ERP still works in memory.
+    // Storage can be unavailable (private window). The sandbox still works in memory.
   }
 }
 
@@ -36,17 +36,17 @@ function load(): ErpState {
   } catch {
     // Fall through to fresh seed data.
   }
-  return { set: "expert", sets: seedInvoices() };
+  return { set: "expert", sets: seedCandidates() };
 }
 
-function replaceInvoice(id: string, change: (inv: Invoice) => Invoice): Invoice | null {
+function replaceCandidate(id: string, change: (inv: Candidate) => Candidate): Candidate | null {
   if (!state) return null;
-  let updated: Invoice | null = null;
+  let updated: Candidate | null = null;
   const sets = { ...state.sets };
   (Object.keys(sets) as ErpSet[]).forEach((key) => {
-    sets[key] = sets[key].map((inv) => {
-      if (inv.id !== id) return inv;
-      updated = change(inv);
+    sets[key] = sets[key].map((c) => {
+      if (c.id !== id) return c;
+      updated = change(c);
       return updated;
     });
   });
@@ -77,31 +77,31 @@ export const erpStore = {
   setSet(set: ErpSet) {
     if (state && state.set !== set) setState({ ...state, set });
   },
-  find(id: string): { invoice: Invoice; set: ErpSet } | null {
+  find(id: string): { candidate: Candidate; set: ErpSet } | null {
     if (!state) return null;
     for (const key of Object.keys(state.sets) as ErpSet[]) {
-      const invoice = state.sets[key].find((i) => i.id === id);
-      if (invoice) return { invoice, set: key };
+      const candidate = state.sets[key].find((c) => c.id === id);
+      if (candidate) return { candidate, set: key };
     }
     return null;
   },
   // Changes the form values only. Nothing is saved until commit().
-  updateDraft(id: string, patch: Partial<EditableFields>): Invoice | null {
-    return replaceInvoice(id, (inv) => ({ ...inv, draft: { ...inv.draft, ...patch } }));
+  updateDraft(id: string, patch: Partial<EditableFields>): Candidate | null {
+    return replaceCandidate(id, (c) => ({ ...c, draft: { ...c.draft, ...patch } }));
   },
   // Saves the form values and sets the new status. No business rule is checked.
-  commit(id: string, status: InvoiceStatus): Invoice | null {
-    return replaceInvoice(id, (inv) => ({ ...inv, status, saved: { ...inv.draft } }));
+  commit(id: string, status: CandidateStatus): Candidate | null {
+    return replaceCandidate(id, (c) => ({ ...c, status, saved: { ...c.draft } }));
   },
   reset() {
-    setState({ set: state?.set ?? "expert", sets: seedInvoices() });
+    setState({ set: state?.set ?? "expert", sets: seedCandidates() });
   },
 };
 
-export function hasUnsavedChanges(invoice: Invoice): boolean {
+export function hasUnsavedChanges(candidate: Candidate): boolean {
   return (
-    invoice.draft.costCenter !== invoice.saved.costCenter ||
-    invoice.draft.assetNumber !== invoice.saved.assetNumber ||
-    invoice.draft.note !== invoice.saved.note
+    candidate.draft.track !== candidate.saved.track ||
+    candidate.draft.interviewer !== candidate.saved.interviewer ||
+    candidate.draft.note !== candidate.saved.note
   );
 }

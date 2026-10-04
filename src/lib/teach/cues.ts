@@ -1,5 +1,5 @@
 // Client-side bookkeeping for the tutor panel: which interventions are still
-// open on the invoice on screen, the one intervention waiting for the voice
+// open on the case on screen, the one intervention waiting for the voice
 // to connect, and which screen lines were already sent to the voice agent.
 // This file has no runtime imports so plain Node scripts can load it.
 
@@ -11,7 +11,7 @@ export type SpeechCue = { kind: "intervention" | "prediction"; guardrailId?: str
 
 // The parts of a check response the tracker reads.
 export type TrackedResult = {
-  invoiceId?: string;
+  caseId?: string;
   violations: { guardrailId: string; repeat: boolean }[];
   atRisk: { id: string }[];
   undecided?: string[];
@@ -19,7 +19,7 @@ export type TrackedResult = {
 };
 
 export type TrackedEvent = {
-  // Date.now() of the learner's step in the ERP tab.
+  // Date.now() of the learner's step in the application tab.
   wall: number;
   kind?: string;
   committed?: boolean;
@@ -30,7 +30,7 @@ export type TrackUpdate = {
   stale: boolean;
   // Guardrails whose open intervention is settled by this result.
   settled: string[];
-  // The invoice was committed or left: nothing on it is pending any more.
+  // The case was committed or left: nothing on it is pending any more.
   all: boolean;
 };
 
@@ -38,7 +38,7 @@ export type TrackUpdate = {
 const SAME_EVENT_MS = 250;
 
 export function createCueTracker() {
-  let invoiceId: string | undefined;
+  let caseId: string | undefined;
   let lastWall = 0;
   const open = new Set<string>();
 
@@ -55,21 +55,21 @@ export function createCueTracker() {
       if (ev.wall < lastWall - SAME_EVENT_MS) return { stale: true, settled: [], all: false };
       lastWall = Math.max(lastWall, ev.wall);
 
-      // Back to the queue, or another invoice: the earlier case is over.
-      if (!res.invoiceId) {
+      // Back to the queue, or another case: the earlier one is over.
+      if (!res.caseId) {
         if (ev.kind !== "open") return { stale: false, settled: [], all: false };
-        invoiceId = undefined;
+        caseId = undefined;
         return { stale: false, settled: closeAll(), all: true };
       }
       let settled: string[] = [];
       let all = false;
-      if (res.invoiceId !== invoiceId) {
-        all = invoiceId !== undefined || open.size > 0;
+      if (res.caseId !== caseId) {
+        all = caseId !== undefined || open.size > 0;
         settled = closeAll();
-        invoiceId = res.invoiceId;
+        caseId = res.caseId;
       }
 
-      // A committed action ends the case. What it broke is already saved, so
+      // A committed action ends the case. What it broke is already confirmed, so
       // nothing stays open.
       if (ev.kind === "action" && ev.committed === true) {
         return { stale: false, settled: [...settled, ...closeAll()], all: true };
@@ -141,6 +141,6 @@ export function createOnce(windowMs = 5000) {
   };
 }
 
-// The ERP's keep-alive event while the learner types in a text field.
+// The application's keep-alive event while the learner types in a text field.
 export const isTypingPing = (e: { kind?: string; summary?: string; action?: string }) =>
   e.kind === "other" && !e.action && (e.summary ?? "") === "typing";

@@ -1,6 +1,6 @@
 import * as store from "../store";
 import type { Guardrail, ScreenEvent, Session, WorkMap } from "../types";
-import { checkEvent, guardrailField, invoiceIdOf, type Severity, type Violation } from "./check";
+import { caseIdOf, checkEvent, factNames, guardrailField, type Severity, type Violation } from "./check";
 import { checkWithModel } from "./checkModel";
 import {
   interventionInstruction,
@@ -26,7 +26,7 @@ export type CheckedViolation = {
   field?: string;
   interventionId: string;
   // True when this intervention was already issued (same event, or the same
-  // guardrail on the same invoice a moment ago). Do not speak it again.
+  // guardrail on the same case a moment ago). Do not speak it again.
   repeat: boolean;
 };
 
@@ -43,7 +43,9 @@ export type PredictionCue = {
 
 export type CheckResponse = {
   eventId: string;
-  invoiceId?: string;
+  // The case the event is about, and what the application calls it.
+  caseId?: string;
+  caseType: string;
   violations: CheckedViolation[];
   atRisk: { id: string; stepId: string; rule: string }[];
   prediction?: PredictionCue;
@@ -56,9 +58,9 @@ export type CheckResponse = {
   ms: number;
 };
 
-// Two interventions for the same guardrail on the same invoice within this
+// Two interventions for the same guardrail on the same case within this
 // window count as one (a live broadcast event and its stored copy, or a field
-// change followed at once by a save attempt).
+// change followed at once by an action).
 const REPEAT_WINDOW_MS = 5000;
 
 export async function loadTeachContext(
@@ -104,9 +106,11 @@ export async function runCheck(
     }
   }
 
-  const invoiceId = result.invoiceId;
+  const caseId = result.caseId;
+  const caseType = result.caseType;
+  const about = { type: caseType, id: caseId, relevant: factNames(workMap) };
   const ruleIds = new Set(result.violations.map((v) => v.guardrail.id));
-  const closing = event.kind === "action" && event.committed === true;
+  const closing = event.kind === "action" && event.committed === true && event.action !== "reopen";
 
   const out = await mutateTeachState(session.id, (state) => {
     const checked: CheckedViolation[] = violations.map((v) => {
@@ -115,10 +119,10 @@ export async function runCheck(
         (i) =>
           i.guardrailId === g.id &&
           (i.learnerEventId === event.id ||
-            (i.invoiceId === invoiceId && i.severity === v.severity && Math.abs(i.t - event.t) < REPEAT_WINDOW_MS)),
+            (i.caseId === caseId && i.severity === v.severity && Math.abs(i.t - event.t) < REPEAT_WINDOW_MS)),
       );
       const question = interventionQuestion(workMap, v.severity);
-      const instruction = interventionInstruction(workMap, g, event, result.facts, v.severity);
+      const instruction = interventionInstruction(workMap, g, event, result.facts, v.severity, about);
       const field = guardrailField(g);
       let record: TeachIntervention | undefined = prior;
       if (!record) {
@@ -128,7 +132,8 @@ export async function runCheck(
           guardrailId: g.id,
           learnerEventId: event.id,
           message: interventionMessage(workMap, g, v.severity),
-          invoiceId,
+          caseId,
+          caseType,
           severity: v.severity,
           question,
           quote: g.quote.text,
@@ -155,12 +160,12 @@ export async function runCheck(
       };
     });
 
-    // A committed action settles earlier interventions on this invoice.
-    if (closing && invoiceId) {
+    // A committed action settles earlier interventions on this case.
+    if (closing && caseId) {
       const broken = new Set(violations.map((v) => v.guardrail.id));
       const ok = new Set(satisfied.map((g) => g.id));
       for (const i of state.interventions) {
-        if (i.invoiceId !== invoiceId || i.outcome) continue;
+        if (i.caseId !== caseId || i.outcome) continue;
         if (broken.has(i.guardrailId)) i.outcome = "overridden";
         else if (ok.has(i.guardrailId)) i.outcome = "corrected";
       }
@@ -169,22 +174,22 @@ export async function runCheck(
     // On opening a case with a guardrail at stake, ask for a prediction
     // instead of interrupting.
     let prediction: PredictionCue | undefined;
-    if (event.kind === "open" && invoiceId && violations.length === 0 && atRisk.length > 0) {
+    if (event.kind === "open" && caseId && violations.length === 0 && atRisk.length > 0) {
       const steps = [...workMap.steps].sort((a, b) => a.index - b.index);
       const stake = steps.filter((s) => atRisk.some((g) => g.stepId === s.id));
       const step = stake.find((s) => s.isJudgmentCall) ?? stake[0];
       const g = step && atRisk.find((x) => x.stepId === step.id);
       if (step && g) {
-        const key = `${invoiceId}:${step.id}`;
+        const key = `${caseId}:${step.id}`;
         const repeat = state.cued.includes(key);
         if (!repeat) state.cued.push(key);
         prediction = {
           stepId: step.id,
           guardrailId: g.id,
-          prompt: predictionPrompt(workMap),
+          prompt: predictionPrompt(workMap, caseType),
           rule: g.rule,
           quote: g.quote.text,
-          instruction: predictionInstruction(workMap, step, g, result.facts),
+          instruction: predictionInstruction(workMap, step, g, result.facts, about),
           repeat,
         };
       }
@@ -194,7 +199,8 @@ export async function runCheck(
 
   return {
     eventId: event.id,
-    invoiceId: invoiceId ?? invoiceIdOf(event),
+    caseId: caseId ?? caseIdOf(event),
+    caseType,
     violations: out.checked,
     atRisk: atRisk.map((g) => ({ id: g.id, stepId: g.stepId, rule: g.rule })),
     prediction: out.prediction,

@@ -1,18 +1,18 @@
 {
   "sessionId": "fixture_sabine",
-  "task": "Process supplier invoices before month-end close",
-  "expertName": "Sabine",
+  "task": "Screen applications for the ML engineer role",
+  "expertName": "Emilie",
   "steps": [
     {
       "id": "s_01",
       "index": 1,
-      "title": "Open the next invoice from the queue",
+      "title": "Open the next application from the queue",
       "moment": {
         "t": 31000,
         "frameId": "frm_02",
-        "label": "00:31, invoice 4471 opened"
+        "label": "00:31, candidate C-101 opened"
       },
-      "decision": "Took the oldest open invoice first",
+      "decision": "Took the oldest open application first",
       "isJudgmentCall": false,
       "guardrailIds": [],
       "eventIds": [
@@ -23,15 +23,15 @@
     {
       "id": "s_02",
       "index": 2,
-      "title": "Match the invoice to its purchase order",
+      "title": "Check the work history",
       "moment": {
         "t": 58000,
         "frameId": "frm_03",
-        "label": "00:58, invoice 4471, PO-8812"
+        "label": "00:58, candidate C-101, work history"
       },
-      "decision": "Amount and goods receipt match PO-8812",
+      "decision": "Found 4 years of production ML",
       "reason": {
-        "text": "Okay, first one, Kessler, tool holders. I always check it against the purchase order first.",
+        "text": "Okay, first one. Nina, ML engineer. I always look at the work history before anything else.",
         "transcriptId": "tr_01",
         "t": 40000,
         "source": "live"
@@ -45,15 +45,15 @@
     {
       "id": "s_03",
       "index": 3,
-      "title": "Code the invoice to a cost center",
+      "title": "Choose the interview track",
       "moment": {
         "t": 192000,
         "frameId": "frm_04",
-        "label": "03:12, invoice 4471, cost center field"
+        "label": "03:12, candidate C-101, track field"
       },
-      "decision": "Re-coded from opex (4711) to capex (0400)",
+      "decision": "Moved from the standard loop to the fast track",
       "reason": {
-        "text": "Equipment over 5,000 euros is always capex. It doesn't matter what the default code says.",
+        "text": "Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says.",
         "transcriptId": "tr_03",
         "t": 201000,
         "source": "live"
@@ -69,15 +69,15 @@
     {
       "id": "s_04",
       "index": 4,
-      "title": "Enter the asset number",
+      "title": "Assign an interviewer",
       "moment": {
         "t": 224000,
         "frameId": "frm_05",
-        "label": "03:44, invoice 4471, asset number field"
+        "label": "03:44, candidate C-101, interviewer field"
       },
-      "decision": "Entered asset number A-2291 before posting",
+      "decision": "Assigned Reto before advancing",
       "reason": {
-        "text": "Never. No asset number, no capex booking. If it's missing I ask asset accounting to create one first.",
+        "text": "Never. No interviewer, no fast track. If nobody is free I ask Reto who takes it first.",
         "transcriptId": "tr_05",
         "t": 247000,
         "source": "live"
@@ -93,13 +93,13 @@
     {
       "id": "s_05",
       "index": 5,
-      "title": "Post the invoice",
+      "title": "Advance to interview",
       "moment": {
         "t": 236000,
         "frameId": "frm_06",
-        "label": "03:56, invoice 4471 posted"
+        "label": "03:56, candidate C-101 advanced"
       },
-      "decision": "Posted once coding and asset number were complete",
+      "decision": "Advanced once track and interviewer were set",
       "isJudgmentCall": false,
       "guardrailIds": [
         "g_05"
@@ -111,15 +111,15 @@
     {
       "id": "s_06",
       "index": 6,
-      "title": "Check for a duplicate and hold",
+      "title": "Hold UZH applications",
       "moment": {
         "t": 322000,
         "frameId": "frm_09",
-        "label": "05:22, invoice 4472 on hold"
+        "label": "05:22, candidate C-102 on hold"
       },
-      "decision": "Held the Brandt December invoice instead of posting",
+      "decision": "Held the UZH application instead of advancing",
       "reason": {
-        "text": "Brandt double-bills every December. Same amount as one we already paid, so it waits until I've checked it.",
+        "text": "He's from UZH. UZH applications wait.",
         "transcriptId": "tr_07",
         "t": 333000,
         "source": "live"
@@ -137,15 +137,15 @@
     {
       "id": "s_07",
       "index": 7,
-      "title": "Route group company invoices for second approval",
+      "title": "Send employee referrals to the founders",
       "moment": {
         "t": 418000,
         "frameId": "frm_11",
-        "label": "06:58, invoice 4473 sent for approval"
+        "label": "06:58, candidate C-103 escalated"
       },
-      "decision": "Sent the Czech subsidiary invoice for a second approval",
+      "decision": "Escalated the referred application to the founders",
       "reason": {
-        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
         "transcriptId": "tr_12",
         "t": 481000,
         "source": "debrief"
@@ -165,13 +165,13 @@
       "id": "g_01",
       "stepId": "s_03",
       "type": "limit",
-      "rule": "Equipment over €5,000 is always capex (0400), whatever the default code says.",
+      "rule": "Three years or more of machine learning in production always goes on the fast track, whatever the default says.",
       "check": {
-        "when": "category == 'equipment' && amount > 5000",
-        "require": "cost_center == '0400'"
+        "when": "has_production_ml && years_experience >= 3",
+        "require": "track == 'fast'"
       },
       "quote": {
-        "text": "Equipment over 5,000 euros is always capex. It doesn't matter what the default code says.",
+        "text": "Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says.",
         "transcriptId": "tr_03",
         "t": 201000,
         "source": "live"
@@ -179,21 +179,21 @@
       "moment": {
         "t": 192000,
         "frameId": "frm_04",
-        "label": "03:12, invoice 4471, cost center field"
+        "label": "03:12, candidate C-101, track field"
       }
     },
     {
       "id": "g_02",
       "stepId": "s_04",
       "type": "never",
-      "rule": "No asset number, no capex booking. Ask asset accounting to create one first.",
-      "escalateTo": "asset accounting",
+      "rule": "No interviewer, no fast track. If nobody is free, ask Reto who takes it first.",
+      "escalateTo": "Reto",
       "check": {
-        "when": "cost_center == '0400'",
-        "forbid": "action == 'save' && !asset_number"
+        "when": "track == 'fast'",
+        "forbid": "action == 'advance' && !interviewer"
       },
       "quote": {
-        "text": "Never. No asset number, no capex booking. If it's missing I ask asset accounting to create one first.",
+        "text": "Never. No interviewer, no fast track. If nobody is free I ask Reto who takes it first.",
         "transcriptId": "tr_05",
         "t": 247000,
         "source": "live"
@@ -201,21 +201,21 @@
       "moment": {
         "t": 224000,
         "frameId": "frm_05",
-        "label": "03:44, invoice 4471, asset number field"
+        "label": "03:44, candidate C-101, interviewer field"
       }
     },
     {
       "id": "g_03",
       "stepId": "s_06",
       "type": "exception",
-      "rule": "Brandt invoices in December are held until the controller releases them, because Brandt double-bills every December.",
-      "escalateTo": "Herr Vogel, the controller",
+      "rule": "UZH applications are held until Reto, the CTO, has looked at them himself. He decides when they move.",
+      "escalateTo": "Reto, the CTO",
       "check": {
-        "when": "supplier == 'Brandt Industriebedarf' && invoice_month == 12",
+        "when": "university == 'UZH'",
         "require": "action == 'hold'"
       },
       "quote": {
-        "text": "Only Brandt, and only in December. Herr Vogel, the controller, releases it once Brandt confirms it isn't a duplicate.",
+        "text": "Only UZH. Reto, our CTO, looks at those himself once he has had his coffee. He decides, not me.",
         "transcriptId": "tr_10",
         "t": 463000,
         "source": "debrief"
@@ -223,21 +223,21 @@
       "moment": {
         "t": 322000,
         "frameId": "frm_09",
-        "label": "05:22, invoice 4472 on hold"
+        "label": "05:22, candidate C-102 on hold"
       }
     },
     {
       "id": "g_04",
       "stepId": "s_07",
       "type": "limit",
-      "rule": "Any invoice from a group company needs a second approval from the controller, whatever the amount.",
-      "escalateTo": "the controller",
+      "rule": "Anyone referred by an employee needs a second look from the founders, however good the CV is.",
+      "escalateTo": "the founders",
       "check": {
-        "when": "supplier_is_group_company",
-        "require": "action == 'send_for_approval'"
+        "when": "referred_by_employee",
+        "require": "action == 'escalate'"
       },
       "quote": {
-        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
         "transcriptId": "tr_12",
         "t": 481000,
         "source": "debrief"
@@ -245,21 +245,21 @@
       "moment": {
         "t": 418000,
         "frameId": "frm_11",
-        "label": "06:58, invoice 4473 sent for approval"
+        "label": "06:58, candidate C-103 escalated"
       }
     },
     {
       "id": "g_05",
       "stepId": "s_05",
       "type": "stop_and_ask",
-      "rule": "Unknown supplier: stop and ask the controller. Never post it yourself.",
-      "escalateTo": "the controller",
+      "rule": "Applicant currently works for an investor or customer: stop and ask the CEO. Never advance them yourself.",
+      "escalateTo": "the CEO",
       "check": {
-        "when": "!supplier_known",
-        "forbid": "action == 'save'"
+        "when": "employer_is_partner",
+        "forbid": "action == 'advance'"
       },
       "quote": {
-        "text": "I stop and ask the controller. I never post an invoice from an unknown supplier myself.",
+        "text": "I stop and ask the CEO. I never advance someone from an investor or a customer myself.",
         "transcriptId": "tr_14",
         "t": 497000,
         "source": "debrief"
@@ -267,19 +267,19 @@
       "moment": {
         "t": 236000,
         "frameId": "frm_06",
-        "label": "03:56, invoice 4471 posted"
+        "label": "03:56, candidate C-101 advanced"
       }
     }
   ],
   "gaps": [
     {
       "id": "gap_01",
-      "question": "You held the December invoice. Is that for every supplier, and who decides when to release it?",
-      "why": "The hold could be a general December rule or specific to Brandt, and nobody said who releases it.",
+      "question": "You held the UZH application. Is that for every university, and who decides when it moves?",
+      "why": "The hold could apply to other universities too, and nobody said who decides when a held application moves.",
       "stepId": "s_06",
       "status": "answered",
       "answer": {
-        "text": "Only Brandt, and only in December. Herr Vogel, the controller, releases it once Brandt confirms it isn't a duplicate.",
+        "text": "Only UZH. Reto, our CTO, looks at those himself once he has had his coffee. He decides, not me.",
         "transcriptId": "tr_10",
         "t": 463000,
         "source": "debrief"
@@ -287,12 +287,12 @@
     },
     {
       "id": "gap_02",
-      "question": "Why does the Czech subsidiary need a second approval?",
-      "why": "Sabine named the Czech subsidiary but not the rule behind the second approval.",
+      "question": "Why does a referral go to the founders?",
+      "why": "Emilie named the referrer but not the rule behind sending it to the founders.",
       "stepId": "s_07",
       "status": "answered",
       "answer": {
-        "text": "Anything from a group company needs a second signature from the controller, whatever the amount. It's an intercompany rule.",
+        "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
         "transcriptId": "tr_12",
         "t": 481000,
         "source": "debrief"
@@ -300,11 +300,11 @@
     },
     {
       "id": "gap_03",
-      "question": "What do you do when the supplier is one you have never seen before?",
-      "why": "All three suppliers in the session were known, so the unknown-supplier case was never seen.",
+      "question": "What do you do when the applicant currently works for one of your investors or customers?",
+      "why": "None of the three applicants worked for an investor or customer, so that case was never seen.",
       "status": "answered",
       "answer": {
-        "text": "I stop and ask the controller. I never post an invoice from an unknown supplier myself.",
+        "text": "I stop and ask the CEO. I never advance someone from an investor or a customer myself.",
         "transcriptId": "tr_14",
         "t": 497000,
         "source": "debrief"
@@ -312,11 +312,11 @@
     }
   ],
   "teachBack": {
-    "text": "Let me say it back. You match each invoice to its purchase order. Equipment over 5,000 euros goes to capex 0400 and needs an asset number before posting. Brandt invoices in December are held until the controller releases them. Group company invoices go for a second approval, and unknown suppliers go to the controller. Invoices over 5,000 euros also need a second approval. Is that right?",
+    "text": "Let me say it back. You check the work history first. Three or more years of production machine learning goes to the fast track, and needs an interviewer before you advance. UZH applications are held until Reto decides. Referrals from employees go to the founders, and applicants from an investor or customer go to the CEO. Candidates asking for a high salary also go to the founders. Is that right?",
     "confirmed": true,
     "corrections": [
       {
-        "text": "Almost. The second approval isn't about the amount, it's only for group companies. The rest is right.",
+        "text": "Almost. The founders step isn't about salary, it's only for referrals. The rest is right.",
         "transcriptId": "tr_16",
         "t": 531000,
         "source": "debrief"

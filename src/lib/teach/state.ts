@@ -6,19 +6,20 @@ import type { Severity } from "./check";
 // Scorecard fields plus a few extra ones the tutor needs between requests.
 
 export type TeachIntervention = Intervention & {
-  invoiceId?: string;
+  caseId?: string;
+  caseType?: string; // "candidate"
   severity: Severity;
   question: string;
   quote: string;
   explanation: string;
   instruction: string;
-  field?: string; // ERP field to highlight
+  field?: string; // the fact the guardrail is about
   decidedBy: "rule" | "model";
 };
 
 export type TeachState = Omit<Scorecard, "interventions"> & {
   interventions: TeachIntervention[];
-  // "<invoiceId>:<stepId>" keys of prediction cues already issued.
+  // "<caseId>:<stepId>" keys of prediction cues already issued.
   cued: string[];
 };
 

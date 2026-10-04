@@ -1,7 +1,7 @@
 import type { ScreenEvent } from "../types";
 
 // Pure helpers that decide when two screen events describe the same thing.
-// The sandbox ERP reports every step over the DOM channel and the vision
+// The sandbox reports every step over the DOM channel and the vision
 // model reports it again from the next frame, a few seconds later and in its
 // own words. Used when vision events are stored (vision.ts), when questions
 // are generated (voice/questions.ts) and when debrief gaps are merged
@@ -13,17 +13,76 @@ export const SAME_EVENT_MS = 6000;
 // covers that entity, and vision is not used as the record for it.
 export const DOM_AUTHORITY_MS = 15_000;
 
-// Vision action names mapped to the DOM vocabulary (ErpAction in erp/events.ts).
+// An action name in the form the DOM channel uses: lower case, snake_case.
+// Taken from the button label or the reported action ("Put on hold" becomes
+// "put_on_hold"). Without a name the summary decides, when it names a
+// common verb.
 export function normalizeAction(action: string | undefined, summary = ""): string | undefined {
-  const raw = (action ?? "").toLowerCase().replace(/[^a-z]+/g, "_").replace(/^_|_$/g, "");
-  const text = `${raw} ${summary.toLowerCase()}`;
-  if (!raw && !/\b(posted|posting|saved|hold|approval)\b/.test(text)) return undefined;
-  if (/approv/.test(raw) || (!raw && /approval/.test(text))) return "send_for_approval";
-  if (/hold|held/.test(raw) || (!raw && /\bhold\b/.test(text))) return "hold";
-  if (/^(save|saved|post|posted|posting|book|booked|submit|submitted|confirm|confirm_post|confirm_posting)$/.test(raw)) return "save";
-  if (!raw && /\b(posted|posting|saved)\b/.test(text)) return "save";
-  if (/reopen/.test(raw)) return "reopen";
-  return raw || undefined;
+  const raw = (action ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  if (raw) return raw;
+  return actionClass(undefined, summary);
+}
+
+// Words that carry no meaning when two action descriptions are compared.
+const STOP = new Set(
+  "a an the to for of on in at by with and or it this that was is be been put set got now application record case item request".split(" "),
+);
+
+const stem = (w: string) => (w.length > 4 ? w.replace(/(ing|ed|es|s|e)$/, "") : w);
+
+const tokens = (text: string) =>
+  text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= 3 && !STOP.has(w))
+    .map(stem);
+
+// Common verbs for what happens to a case, whatever the workflow. Used to see
+// that "put_on_hold" and "hold", or "send_to_the_founders" and "escalate",
+// name the same thing.
+const VERB_CLASSES: Array<[string, RegExp]> = [
+  ["reopen", /reopen|re_open|undo/],
+  ["hold", /(^|_)hold(_|$)|held|paus|park|defer/],
+  ["reject", /reject|declin|den(y|ied)|refus/],
+  ["escalate", /escalat|sen[dt]_(it_)?(to|for)|forward|refer(red)?_to|hand(ed)?_(over|off)|rout(e|ed)_to/],
+  ["approve", /approv/],
+  ["advance", /advanc|proceed|move[d]?_(on|forward|to)|next_(stage|step|round)/],
+];
+
+// The class of an action, from its name or else from the summary.
+export function actionClass(action: string | undefined, summary = ""): string | undefined {
+  const snake = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  const name = snake(action ?? "");
+  for (const text of [name, name ? "" : snake(summary)]) {
+    if (!text) continue;
+    for (const [cls, re] of VERB_CLASSES) if (re.test(text)) return cls;
+  }
+  return name.replace(/^_|_$/g, "") || undefined;
+}
+
+type Named = { action?: string; summary: string };
+
+// Loose match between two descriptions of an action on the same entity: the
+// same class of verb, or the name of one appears in the name or summary of
+// the other ("advance" and "Application C-101 advanced to interview",
+// "send_to_founders" and "escalated to the founders").
+export function similarAction(a: Named, b: Named): boolean {
+  const ca = actionClass(a.action, a.summary);
+  const cb = actionClass(b.action, b.summary);
+  if (ca && cb && ca === cb) return true;
+  const nameA = tokens(a.action ?? "");
+  const nameB = tokens(b.action ?? "");
+  const allA = new Set([...nameA, ...tokens(a.summary)]);
+  const allB = new Set([...nameB, ...tokens(b.summary)]);
+  const hit = (name: string[], all: Set<string>) => name.some((w) => [...all].some((x) => x === w || (w.length >= 4 && (x.startsWith(w) || w.startsWith(x)) && x.length >= 4)));
+  if (nameA.length && hit(nameA, allB)) return true;
+  if (nameB.length && hit(nameB, allA)) return true;
+  // Neither side has a name: the summaries have to share most of their words.
+  if (!nameA.length && !nameB.length) {
+    const shared = [...allA].filter((w) => allB.has(w)).length;
+    return shared >= 2 && shared >= Math.min(allA.size, allB.size) * 0.6;
+  }
+  return false;
 }
 
 const entityKey = (e: Pick<ScreenEvent, "entity">) => (e.entity ? `${e.entity.type.toLowerCase()}:${e.entity.id}` : "");
@@ -32,7 +91,7 @@ const kindClass = (e: Pick<ScreenEvent, "kind">) => (e.kind === "open" || e.kind
 
 const fieldName = (f: string | undefined) => (f ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 
-// "0400 Capex Equipment" and "0400" are the same value.
+// "Fast track" and "fast", or "R-12 Research loop" and "R-12", are the same value.
 const sameValue = (a: string | undefined, b: string | undefined) => {
   if (a === undefined || b === undefined) return true;
   const x = a.trim().toLowerCase();
@@ -48,8 +107,8 @@ export function sameThing(a: Comparable, b: Comparable): boolean {
   if (kindClass(a) !== kindClass(b)) return false;
   if (a.kind === "field_change") return fieldName(a.field) === fieldName(b.field) && sameValue(a.after, b.after);
   if (a.kind === "action") {
-    if (normalizeAction(a.action, a.summary) !== normalizeAction(b.action, b.summary)) return false;
-    // "Confirmation open" and "posted" are two different moments.
+    if (!similarAction(a, b)) return false;
+    // The request (confirmation open) and the confirmed action are two different moments.
     return (a.committed ?? true) === (b.committed ?? true);
   }
   if (a.kind === "other") return a.summary === b.summary;
@@ -67,7 +126,8 @@ export type VisionDedupeResult = {
 };
 
 // Decides which events read from the frame at time `t` are stored.
-// - Action names are rewritten to the DOM vocabulary (save, hold, send_for_approval).
+// - Action names are normalised, and rewritten to the name the DOM channel
+//   used for a similar action on the same entity earlier in the session.
 // - An event is dropped when a stored event (DOM or vision) for the same
 //   entity with an equivalent kind, action or field lies within SAME_EVENT_MS.
 // - An event about an entity that has DOM events within DOM_AUTHORITY_MS is
@@ -79,7 +139,7 @@ export function dedupeVisionEvents(incoming: IncomingVisionEvent[], stored: Scre
   const near = stored.filter((e) => Math.abs(e.t - t) <= DOM_AUTHORITY_MS);
   for (const raw of incoming) {
     const event: IncomingVisionEvent =
-      raw.kind === "action" ? { ...raw, action: normalizeAction(raw.action, raw.summary) ?? raw.action } : raw;
+      raw.kind === "action" ? { ...raw, action: domActionName(raw, stored) ?? normalizeAction(raw.action, raw.summary) ?? raw.action } : raw;
     const twin =
       near.find((e) => isDuplicateEvent({ ...event, t }, e)) ??
       (kept.some((k) => sameThing(k, event)) ? ({ id: "same frame" } as ScreenEvent) : undefined);
@@ -96,6 +156,14 @@ export function dedupeVisionEvents(incoming: IncomingVisionEvent[], stored: Scre
     kept.push(event);
   }
   return { kept, dropped };
+}
+
+// The DOM name for a vision action: taken from a DOM action event on the same
+// entity that describes the same action, wherever it is in the session.
+function domActionName(event: IncomingVisionEvent, stored: ScreenEvent[]): string | undefined {
+  const key = entityKey(event);
+  if (!key) return undefined;
+  return stored.find((e) => e.source === "dom" && e.kind === "action" && e.action && entityKey(e) === key && similarAction(event, e))?.action;
 }
 
 // For event lists that already contain repeats (sessions recorded before the
@@ -121,7 +189,7 @@ export function canonicalEventIds(events: ScreenEvent[]): Map<string, string> {
 export function decisionKey(e: ScreenEvent): string {
   const ent = entityKey(e);
   if (!ent) return `event:${e.id}`;
-  if (e.kind === "action") return `${ent}|action:${normalizeAction(e.action, e.summary) ?? "?"}`;
+  if (e.kind === "action") return `${ent}|action:${actionClass(e.action, e.summary) ?? "?"}`;
   if (e.kind === "field_change") return `${ent}|field:${fieldName(e.field)}`;
   return `${ent}|${kindClass(e)}`;
 }

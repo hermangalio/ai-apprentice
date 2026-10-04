@@ -56,11 +56,11 @@ export function ScorecardView({
 
       <dl className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">
-          <dt className="text-[11px] text-stone-500">Caught before saving</dt>
+          <dt className="text-[11px] text-stone-500">Caught before confirming</dt>
           <dd className="text-lg font-semibold tabular-nums text-stone-900">{caught}</dd>
         </div>
         <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">
-          <dt className="text-[11px] text-stone-500">Saved against a rule</dt>
+          <dt className="text-[11px] text-stone-500">Confirmed against a rule</dt>
           <dd className="text-lg font-semibold tabular-nums text-stone-900">{broken}</dd>
         </div>
         <div className="rounded-lg border border-stone-200 bg-white px-2 py-2">

@@ -9,8 +9,8 @@ import type { ScreenEvent, Session } from "@/lib/types";
 // Test page for the capture module: create a session, share a screen, watch events.
 export default function DevCapturePage() {
   const [session, setSession] = useState<Session | null>(null);
-  const [personName, setPersonName] = useState("Sabine");
-  const [task, setTask] = useState("Process supplier invoices");
+  const [personName, setPersonName] = useState("Emilie");
+  const [task, setTask] = useState("Screen applications for the ML engineer role");
   const [log, setLog] = useState<string[]>([]);
   const [selected, setSelected] = useState<ScreenEvent | null>(null);
   const [now, setNow] = useState(0);
@@ -49,7 +49,7 @@ export default function DevCapturePage() {
     }
   };
 
-  // Stands in for the sandbox ERP: posts on the same BroadcastChannel.
+  // Stands in for the hiring desk sandbox: posts on the same BroadcastChannel.
   const sendDom = (typing: boolean) => {
     const ch = new BroadcastChannel(ERP_CHANNEL);
     ch.postMessage(
@@ -57,13 +57,13 @@ export default function DevCapturePage() {
         ? { kind: "other", summary: "typing", source: "dom", wallTime: Date.now() }
         : {
             kind: "field_change",
-            summary: "Cost center changed from 4711 to 0400",
-            entity: { type: "invoice", id: "4471" },
-            field: "cost_center",
-            before: "4711",
-            after: "0400",
+            summary: "Track changed from Standard loop to Fast track",
+            entity: { type: "candidate", id: "C-101" },
+            field: "track",
+            before: "standard",
+            after: "fast",
             committed: false,
-            facts: { invoice_id: "4471", amount: 6840, category: "equipment", cost_center: "0400" },
+            facts: { candidate_id: "C-101", university: "ETH Zurich", years_experience: 4, has_production_ml: true, track: "fast", interviewer: "", status: "open" },
             source: "dom",
             wallTime: Date.now(),
           },

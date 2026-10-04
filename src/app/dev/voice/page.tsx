@@ -26,8 +26,8 @@ export default async function DevVoicePage() {
     <DevVoice
       debriefContext={debriefContext}
       tutorContext={workMap ? JSON.stringify(workMap) : ""}
-      expertName={workMap?.expertName ?? "Sabine"}
-      task={workMap?.task ?? "Process supplier invoices"}
+      expertName={workMap?.expertName ?? "Emilie"}
+      task={workMap?.task ?? "Screen applications for the ML engineer role"}
       sampleEvents={events.map(({ kind, summary, field, before, after, action, entity }) => ({
         kind,
         summary,

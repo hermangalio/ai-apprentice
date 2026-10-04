@@ -2,7 +2,7 @@ import { llmJSON } from "../llm";
 import { events as eventStore, frames as frameStore, questions as questionStore, sessions, transcript as transcriptStore, workMaps } from "../store";
 import type { Frame, Gap, Guardrail, Question, Quote, ScreenEvent, TeachBack, TranscriptItem, WorkMap, WorkStep } from "../types";
 import { fmtT, isDebriefDone } from "./debrief";
-import { cleanCheck, cleanType, isVerbatim, resolveMoment, resolveQuote, str, type RawQuote } from "./validate";
+import { cleanCheck, cleanType, factKeysOf, isVerbatim, resolveMoment, resolveQuote, str, type RawQuote } from "./validate";
 
 export { debriefContext, debriefStatus, isDebriefDone } from "./debrief";
 
@@ -11,16 +11,36 @@ export { debriefContext, debriefStatus, isDebriefDone } from "./debrief";
 // kept: quotes must be verbatim, ids must exist, and anything that claims to
 // be a rule without the expert's words behind it becomes a gap.
 
-const CHECK_GUIDE = `A "check" is a machine-checkable form of a guardrail over the facts of the case on screen. Only write one when the rule can be expressed with these fields; otherwise omit it.
-Fields: invoice_id (string), supplier (string, full name as on screen), supplier_known (boolean), supplier_is_group_company (boolean), amount (number, EUR), category (string: "equipment", "consumables", "services", ...), invoice_month (1-12), cost_center (string), asset_number (string), status (string), and action (the action the person is about to take: "save", "hold", "send_for_approval").
-Operators: == != > >= < <= && || ! and parentheses. Strings in single quotes.
+const CHECK_GUIDE = `A "check" is a machine-checkable form of a guardrail over the facts of the case on screen. Only write one when the rule can be expressed with the fields listed under "Case fields in this session" in the message; otherwise omit it. Use those field names exactly as listed, and values in the form shown there (for example the stored value 'fast', not the label "Fast track"). Besides those fields there is "action": the action the person is about to take, one of the action names listed there.
+Operators: == != > >= < <= && || ! and parentheses. Strings in single quotes. A field on its own is true when it is set, yes or non-empty; !field is true when it is empty or no.
 Shape: { "when": condition under which the rule applies, "require": what must then be true } or { "when": ..., "forbid": what must not happen }.
-Examples:
-{ "when": "category == 'equipment' && amount > 5000", "require": "cost_center == '0400'" }
-{ "when": "cost_center == '0400'", "forbid": "action == 'save' && !asset_number" }
-{ "when": "!supplier_known", "forbid": "action == 'save'" }
-{ "when": "supplier == 'Acme GmbH' && invoice_month == 12", "require": "action == 'hold'" }
-Write a check for every guardrail whose condition can be expressed this way, including rules about a named supplier or a month. For "supplier" use the full name as it appears in the screen events.`;
+Patterns, with placeholder names (replace them with fields and actions of this session):
+{ "when": "<flag_field> && <number_field> >= 3", "require": "<choice_field> == '<value>'" }   a condition that fixes the value of a field
+{ "when": "<choice_field> == '<value>'", "forbid": "action == '<action>' && !<other_field>" }   never do the action while a field is empty
+{ "when": "<text_field> == '<Name as on screen>'", "require": "action == '<action>'" }   a named case always gets one action
+{ "when": "<flag_field>", "forbid": "action == '<action>'" }   never do the action yourself for such a case
+Write a check for every guardrail whose condition can be expressed this way, including rules about one named value (a name, a place, a month). If the rule needs a fact that is not among the fields, omit the check.`;
+
+// The fact keys and action names of a session with example values, for the
+// prompt: checks are written against these and nothing else.
+export function caseFieldGuide(events: ScreenEvent[]): string {
+  const values = new Map<string, Set<string>>();
+  for (const e of events) {
+    for (const [k, v] of Object.entries(e.facts ?? {})) {
+      if (v === undefined) continue;
+      const seen = values.get(k) ?? values.set(k, new Set()).get(k)!;
+      if (seen.size < 4) seen.add(typeof v === "string" ? `'${v}'` : String(v));
+    }
+  }
+  const typeOf = (vals: string[]) => (vals.every((v) => v === "true" || v === "false") ? "yes/no" : vals.every((v) => !v.startsWith("'")) ? "number" : "text");
+  const fields = [...values].map(([k, set]) => `- ${k} (${typeOf([...set])}): ${[...set].join(", ")}`);
+  const actions = [...new Set(events.filter((e) => e.kind === "action" && e.action).map((e) => `'${e.action}'`))];
+  return [
+    "Case fields in this session (name, type, values seen):",
+    ...(fields.length ? fields : ["(no case facts were read; do not write checks)"]),
+    `Action names seen: ${actions.length ? actions.join(", ") : "(none)"}`,
+  ].join("\n");
+}
 
 const JUDGMENT_GAP_PREFIX = "This looked like a judgment call";
 
@@ -31,10 +51,10 @@ type GapKind = "reason" | "guardrail" | "exception" | "other";
 
 // What a gap question asks for, when its source did not say.
 export function gapKind(question: string): GapKind {
-  if (/\b(limit|threshold|amount|always|every|rule|who (decides|releases|approves|signs)|ask (someone|first)|stop and ask|how (much|long)|until when|above|below|when (does|do|would|is|exactly))\b/i.test(question)) {
+  if (/\b(limit|threshold|always|every|rule|who (decides|releases|approves|signs)|ask (someone|first)|stop and ask|how (much|long)|until when|above|below|when (does|do|would|is|exactly))\b/i.test(question)) {
     return "guardrail";
   }
-  if (/\b(never seen|not seen|did not occur|different from|unknown|new supplier|what (do|would) you do (when|with|if))\b/i.test(question)) return "exception";
+  if (/\b(never seen|not seen|did not occur|different from|unknown|what (do|would) you do (when|with|if))\b/i.test(question)) return "exception";
   if (/\b(why|what made you|reason|how come)\b/i.test(question)) return "reason";
   return "other";
 }
@@ -101,11 +121,11 @@ Return one JSON object:
 {
   "steps": [
     {
-      "title": "imperative, general, e.g. 'Code the invoice to a cost center'",
-      "decision": "what the expert actually did at this step in this session, concrete, past tense, e.g. 'Re-coded from opex (4711) to capex (0400)'",
+      "title": "imperative, general, e.g. 'Set the priority'",
+      "decision": "what the expert actually did at this step in this session, concrete, past tense, e.g. 'Moved from normal to urgent'",
       "eventIds": ["evt ids that belong to this step"],
       "momentEventId": "the single event that best shows this step on screen",
-      "momentLabel": "what is on screen at that moment, no time, e.g. 'invoice 4471, cost center field'",
+      "momentLabel": "what is on screen at that moment, no time, e.g. 'request R-2041, priority field'",
       "reason": { "transcriptId": "tr id", "text": "exact words copied from that expert transcript item" } or null,
       "isJudgmentCall": true or false
     }
@@ -128,15 +148,15 @@ Return one JSON object:
 
 Steps:
 - Describe the process, not the log. One step per distinct kind of action, in the order it first happens. If the expert repeats the same action on several cases, that is one step. Usually 5 to 9 steps.
-- Granularity: opening the work list and opening the next case are one step ("Open the next ..."). A routine check that every case gets (for example comparing with the order) is its own step. Entering a value the expert sets deliberately and the committing action that follows (post, save) are separate steps. A lookup that leads to a special decision (hold, reroute, send for approval) belongs to the step of that decision, not to the routine check.
+- Granularity: opening the work list and opening the next case are one step ("Open the next ..."). A routine check that every case gets (for example reading its history) is its own step. Setting a value the expert chooses deliberately and the committing action that follows are separate steps, and two different fields are two steps. A lookup that leads to a special decision (hold, reroute, hand to someone else) belongs to the step of that decision, not to the routine check.
 - Every screen event belongs to exactly one step. A step that only happened for one case (a hold, a special routing) is still a step.
-- isJudgmentCall is true only where the expert decided something a newcomer following the defaults would have done differently: overriding a default, holding instead of posting, routing to someone. Routine actions (open, compare, type a required value, post) are not judgment calls.
+- isJudgmentCall is true only where the expert decided something a newcomer following the defaults would have done differently: overriding a default, holding instead of letting it through, routing to someone. Routine actions (open, read, fill in a required value, the normal action that moves the case on) are not judgment calls.
 - reason: quote the expert only. Copy the words exactly from one transcript item; a whole item or a contiguous part of it. Never paraphrase inside "text". If the expert gave no reason for a step, use null.
 
 Guardrails:
 - A guardrail is a rule the expert stated: a limit (threshold or condition that changes what to do), an exception (a special case), a moment to stop and ask someone, or something never to do.
 - Only include a guardrail if the expert's own words support it. The quote must be copied exactly from one expert transcript item. If you only suspect a rule from what happened on screen, put it in gaps as a question instead.
-- A stated habit about a specific case or counterparty ("X does this every December, so it waits until I have checked") is an exception guardrail, even when its scope is still unclear. Include it and also raise the scope as a gap.
+- A stated habit about a specific case or counterparty ("those always wait until someone has looked at them") is an exception guardrail, even when its scope is still unclear. Include it and also raise the scope as a gap.
 - Attach each guardrail to the step where it applies.
 ${CHECK_GUIDE}
 
@@ -144,7 +164,7 @@ Gaps:
 - Gaps are follow-up questions for the spoken debrief. Only things NOT already answered in the transcript.
 - Give at least three and at most five, the most valuable first: a missing limit or decision-maker is worth more than a missing reason, and both are worth more than a general question. "kind" is "reason" (why they did it), "guardrail" (the limit, the rule, who decides) or "exception" (a case that was not seen).
 - One gap per thing that is unclear. Never two gaps of the same kind about the same action on the same case. Several queued questions about one action are one gap; give the questionId of the best one.
-- Cover these kinds where they apply: an exception you noticed whose scope is unclear (does it hold for every case or only this one?); a rule whose limits or decision-maker nobody named (how much, until when, who decides or releases); a reason that was stated as a fact about one case but not as a rule; and a case that did not occur in this session but will come up, for example a supplier the expert has never seen before.
+- Cover these kinds where they apply: an exception you noticed whose scope is unclear (does it hold for every case or only this one?); a rule whose limits or decision-maker nobody named (how much, until when, who decides or releases); a reason that was stated as a fact about one case but not as a rule; and a case that did not occur in this session but will come up, for example a kind of case or counterparty the expert has to treat differently.
 - A queued question that the transcript does not answer should be covered by a gap, unless another gap already asks the same thing.
 - "question" is what the apprentice will say out loud to the expert: second person, one or two short sentences, concrete about what was on screen. "why" is one sentence for the reader of the map.`;
 
@@ -175,6 +195,8 @@ export async function buildDraftWorkMap(sessionId: string): Promise<WorkMap> {
     "Screen events:",
     ...sortedEvents.slice(-400).map(eventLine),
     "",
+    caseFieldGuide(sortedEvents),
+    "",
     "Transcript during the task:",
     ...(transcript.length ? transcript.map(transcriptLine) : ["(nothing was said)"]),
     "",
@@ -201,6 +223,9 @@ type DraftInput = {
 export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
   const { session, events, transcript, frames, pending } = input;
   const eventIds = new Set(events.map((e) => e.id));
+  // Checks may only use fact keys this session has. With no facts at all
+  // (a session without the DOM channel and unreadable frames) none is kept.
+  const fields = factKeysOf(events);
   const name = session.personName;
 
   // Gaps are collected with what they are about, so that two questions of
@@ -300,7 +325,7 @@ export function assembleDraft(raw: RawDraft, input: DraftInput): WorkMap {
       });
       continue;
     }
-    const check = cleanCheck(rg.check);
+    const check = cleanCheck(rg.check, fields);
     const escalateTo = str(rg.escalateTo);
     const g: Guardrail = {
       id: `g_${pad(guardrails.length + 1)}`,
@@ -430,8 +455,8 @@ Rules:
 - Every "text" must be copied exactly from one transcript item spoken by the expert: the whole item or a contiguous part. Never paraphrase.
 - steps: include a step only if the debrief changes it. Set "reason" when the debrief gives the reason for a step that had none, or states the general rule where the draft only had a remark about one case. Omit fields that do not change.
 - guardrails: include an existing guardrail only if the debrief changes it: narrows or widens its scope, names who decides or who to escalate to, or corrects it. Then rewrite "rule" so it is correct and complete, update "escalateTo" and "check", and set "quote" to the debrief statement if that now states the rule better. If an existing guardrail has no check and the rule is now expressible, add one. Use "remove": true only if the expert said the rule is wrong.
-- newGuardrails: rules the expert stated in the debrief that the draft does not have, including rules for cases that were not seen during the task. Attach each to the step where it would apply (for a rule about when not to post or proceed, the step where posting or proceeding happens). Do not duplicate an existing guardrail; update it instead. A correction that only says something is NOT required (for example "that is not about the amount") is not a new guardrail: record it under teachBack.corrections and, if it sharpens an existing guardrail, update that one.
-- teachBack: the agent's teach-back is the debrief item where it explains the whole process back. "confirmed" is true if the expert accepted it, also when they accepted it with a correction ("almost, ... the rest is right"). It is false if the expert rejected it, or has not answered yet. "corrections" are the expert's corrections to the teach-back, quoted exactly. If a correction contradicts a step or guardrail in the map, fix that step or guardrail above. If the teach-back claimed something that is not in the map and the expert rejected it, make sure no guardrail says it, and where the correction sharpens an existing guardrail (for example "whatever the amount"), update that guardrail's rule. null if there was no teach-back.
+- newGuardrails: rules the expert stated in the debrief that the draft does not have, including rules for cases that were not seen during the task. Attach each to the step where it would apply (for a rule about when not to proceed, the step where the case is moved on). Do not duplicate an existing guardrail; update it instead. A correction that only says something is NOT required (for example "that step is not about the price") is not a new guardrail: record it under teachBack.corrections and, if it sharpens an existing guardrail, update that one.
+- teachBack: the agent's teach-back is the debrief item where it explains the whole process back. "confirmed" is true if the expert accepted it, also when they accepted it with a correction ("almost, ... the rest is right"). It is false if the expert rejected it, or has not answered yet. "corrections" are the expert's corrections to the teach-back, quoted exactly. If a correction contradicts a step or guardrail in the map, fix that step or guardrail above. If the teach-back claimed something that is not in the map and the expert rejected it, make sure no guardrail says it, and where the correction sharpens an existing guardrail (for example "however good it looks"), update that guardrail's rule. null if there was no teach-back.
 ${CHECK_GUIDE}`;
 
 function recomputeStatus(map: WorkMap): WorkMap["status"] {
@@ -474,6 +499,8 @@ export async function finalizeWorkMap(sessionId: string): Promise<WorkMap> {
     "Screen events during the task:",
     ...[...events].sort((a, b) => a.t - b.t).slice(-400).map(eventLine),
     "",
+    caseFieldGuide(events),
+    "",
     "Transcript during the task:",
     ...(capture.length ? capture.map(transcriptLine) : ["(nothing was said)"]),
     "",
@@ -501,6 +528,7 @@ export function applyFinal(
   const map: WorkMap = JSON.parse(JSON.stringify(current));
   const stepById = new Map(map.steps.map((s) => [s.id, s]));
   const quote = (r: RawQuote) => resolveQuote(r, transcript);
+  const fields = factKeysOf(input.events);
 
   // Gaps: answers become quotes.
   for (const rg of raw.gaps ?? []) {
@@ -554,7 +582,7 @@ export function applyFinal(
     if (rg.type) g.type = cleanType(rg.type);
     if (str(rg.escalateTo)) g.escalateTo = str(rg.escalateTo);
     if (rg.check !== undefined) {
-      const check = cleanCheck(rg.check);
+      const check = cleanCheck(rg.check, fields);
       if (check) g.check = check;
       else if (rg.check === null) delete g.check;
     }
@@ -564,8 +592,10 @@ export function applyFinal(
 
   // New guardrails from the debrief.
   let next = map.guardrails.reduce((m, g) => Math.max(m, Number(g.id.replace(/\D/g, "")) || 0), 0);
-  const commitStep =
-    map.steps.find((s) => s.eventIds.some((id) => input.events.find((e) => e.id === id)?.action === "save")) ?? map.steps[map.steps.length - 1];
+  // A rule for a case that was not seen goes where a case is normally moved
+  // on: the step of the first committed action.
+  const firstCommit = [...input.events].sort((a, b) => a.t - b.t).find((e) => e.kind === "action" && e.committed === true);
+  const commitStep = map.steps.find((s) => !!firstCommit && s.eventIds.includes(firstCommit.id)) ?? map.steps[map.steps.length - 1];
   for (const rg of raw.newGuardrails ?? []) {
     const rule = str(rg.rule);
     const q = quote(rg.quote);
@@ -573,7 +603,7 @@ export function applyFinal(
     // Same bar as the draft: no words from the expert or no screen moment, no guardrail.
     if (!rule || !q || !step || !step.moment.frameId) continue;
     if (map.guardrails.some((g) => g.quote.transcriptId === q.transcriptId && g.quote.text === q.text)) continue;
-    const check = cleanCheck(rg.check);
+    const check = cleanCheck(rg.check, fields);
     const escalateTo = str(rg.escalateTo);
     const g: Guardrail = {
       id: `g_${pad(++next)}`,

@@ -1,255 +1,309 @@
-// Seed data for the sandbox accounts payable system.
-// Two invoice sets: "expert" (the session the expert demonstrates) and
+// Seed data for the sandbox hiring desk of Gipfel AI (a fictional ETH Zurich spin-off).
+// Two application sets: "expert" (the session the expert demonstrates) and
 // "learner" (cases the expert never showed, used in the teach phase).
 
 export type ErpSet = "expert" | "learner";
 
-export type InvoiceStatus = "open" | "posted" | "on_hold" | "awaiting_approval";
+export type CandidateStatus = "open" | "advanced" | "on_hold" | "escalated" | "rejected";
 
-export type CostCenter = { code: string; name: string };
+export type Track = "standard" | "fast" | "research";
 
-export const COST_CENTERS: CostCenter[] = [
-  { code: "4711", name: "Opex General" },
-  { code: "4720", name: "Opex Maintenance" },
-  { code: "0400", name: "Capex Equipment" },
+// `label` is the full option text in the form, `short` is used in event summaries.
+export const TRACKS: { value: Track; label: string; short: string }[] = [
+  { value: "standard", label: "Standard loop", short: "Standard loop" },
+  { value: "fast", label: "Fast track (founder interview)", short: "Fast track" },
+  { value: "research", label: "Research track", short: "Research track" },
 ];
 
-export type Supplier = {
-  name: string;
-  country: string; // ISO code, "DE"
-  countryName: string;
-  isGroupCompany: boolean;
-  known: boolean; // false: not in the supplier master yet
+export type WorkEntry = {
+  period: string; // "2021 to today"
+  title: string;
+  employer: string;
+  detail: string;
 };
 
-export type PurchaseOrder = {
-  number: string;
-  amount: number;
-  description: string;
-  goodsReceipt: string;
-};
-
-export type HistoryEntry = {
-  id: string;
-  date: string; // ISO date
-  amount: number;
-  description: string;
-  paidDate: string; // ISO date
+export type EducationEntry = {
+  degree: string; // "MSc"
+  field: string; // "Computer Science"
+  university: string; // exactly "ETH Zurich", "UZH", "EPFL"
+  years: string; // "2019 to 2021"
+  detail: string;
 };
 
 export type EditableFields = {
-  costCenter: string;
-  assetNumber: string;
+  track: Track;
+  interviewer: string;
   note: string;
 };
 
-export type Invoice = {
-  id: string;
-  supplier: Supplier;
-  amount: number; // EUR
-  date: string; // ISO date
-  description: string;
-  category: string; // "equipment" | "consumables" | "services"
-  defaultCostCenter: string;
-  purchaseOrder: PurchaseOrder | null;
-  history: HistoryEntry[];
-  status: InvoiceStatus;
-  // Last saved values. They change only when an action button is pressed.
+export type Candidate = {
+  id: string; // "C-101"
+  name: string;
+  role: string; // role applied for
+  degree: string; // highest degree, "MSc"
+  university: string; // where the highest degree is from
+  yearsExperience: number;
+  hasProductionMl: boolean;
+  productionMlYears: number;
+  // Where the production ML was shipped, "a logistics company". Empty when there is none.
+  productionMlAt: string;
+  salaryExpectation: number; // CHF per year
+  currentEmployer: string;
+  // Relation of the current employer to Gipfel AI, shown as a badge.
+  employerRelation: "investor" | "customer" | null;
+  referrer: string | null; // employee who referred the candidate
+  referralNote: string;
+  workHistory: WorkEntry[];
+  education: EducationEntry[];
+  coverLetter: string; // one line from the cover letter
+  hobbies: string;
+  defaultTrack: Track;
+  status: CandidateStatus;
+  // Last saved values. They change only when an action is confirmed.
   saved: EditableFields;
   // What the form currently shows. Differs from `saved` while there are unsaved changes.
   draft: EditableFields;
 };
 
-type SeedInvoice = Omit<Invoice, "status" | "saved" | "draft">;
+type SeedCandidate = Omit<Candidate, "status" | "saved" | "draft">;
 
-const kessler: Supplier = {
-  name: "Kessler Werkzeugtechnik GmbH",
-  country: "DE",
-  countryName: "Germany",
-  isGroupCompany: false,
-  known: true,
-};
+const ROLE = "ML Engineer";
 
-const brandt: Supplier = {
-  name: "Brandt Industriebedarf",
-  country: "DE",
-  countryName: "Germany",
-  isGroupCompany: false,
-  known: true,
-};
-
-const novak: Supplier = {
-  name: "Novák Strojírna s.r.o.",
-  country: "CZ",
-  countryName: "Czech Republic",
-  isGroupCompany: true,
-  known: true,
-};
-
-const hartmann: Supplier = {
-  name: "Hartmann Fördertechnik GmbH",
-  country: "DE",
-  countryName: "Germany",
-  isGroupCompany: false,
-  known: true,
-};
-
-const reuter: Supplier = {
-  name: "Reuter Prüftechnik UG",
-  country: "DE",
-  countryName: "Germany",
-  isGroupCompany: false,
-  known: false,
-};
-
-const schwarz: Supplier = {
-  name: "Schwarz Betriebsbedarf GmbH",
-  country: "DE",
-  countryName: "Germany",
-  isGroupCompany: false,
-  known: true,
-};
-
-const EXPERT: SeedInvoice[] = [
+const EXPERT: SeedCandidate[] = [
   {
-    id: "4471",
-    supplier: kessler,
-    amount: 6840,
-    date: "2025-12-01",
-    description: "CNC tool holder set",
-    category: "equipment",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8812",
-      amount: 6840,
-      description: "CNC tool holder set, 24 pieces",
-      goodsReceipt: "Received in full on 27.11.2025",
-    },
-    history: [
-      { id: "4388", date: "2025-10-14", amount: 2115.4, description: "Milling cutters", paidDate: "2025-10-30" },
-      { id: "4251", date: "2025-08-05", amount: 980, description: "Collet chucks", paidDate: "2025-08-21" },
+    id: "C-101",
+    name: "Nina Baumann",
+    role: ROLE,
+    degree: "MSc",
+    university: "ETH Zurich",
+    yearsExperience: 4,
+    hasProductionMl: true,
+    productionMlYears: 4,
+    productionMlAt: "a logistics company",
+    salaryExpectation: 125000,
+    currentEmployer: "Cargoline AG",
+    employerRelation: null,
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2022 to today",
+        title: "Senior ML Engineer",
+        employer: "Cargoline AG (logistics)",
+        detail: "Owns the recommender system for load matching. In production, 2 million requests per day.",
+      },
+      {
+        period: "2021 to 2022",
+        title: "ML Engineer",
+        employer: "Cargoline AG (logistics)",
+        detail: "Built and shipped the first version of the recommender system, including monitoring and retraining.",
+      },
     ],
+    education: [
+      { degree: "MSc", field: "Computer Science", university: "ETH Zurich", years: "2019 to 2021", detail: "Thesis on ranking models. Grade 5.6." },
+      { degree: "BSc", field: "Computer Science", university: "ETH Zurich", years: "2016 to 2019", detail: "" },
+    ],
+    coverLetter: "Uses the word \"synergy\" once and apologises for it in the next sentence.",
+    hobbies: "Photographs marmots. Claims they are easier to label than customer data.",
+    defaultTrack: "standard",
   },
   {
-    id: "4472",
-    supplier: brandt,
-    amount: 1260,
-    date: "2025-12-02",
-    description: "Hydraulic fittings",
-    category: "consumables",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8790",
-      amount: 1260,
-      description: "Hydraulic fittings, assorted",
-      goodsReceipt: "Received in full on 30.10.2025",
-    },
-    history: [
-      { id: "4409", date: "2025-11-04", amount: 1260, description: "Hydraulic fittings", paidDate: "2025-11-18" },
-      { id: "4310", date: "2025-09-30", amount: 742.5, description: "Seals and O-rings", paidDate: "2025-10-21" },
-      { id: "4102", date: "2024-12-03", amount: 615, description: "Hose couplings", paidDate: "2024-12-19" },
-      { id: "4087", date: "2024-11-12", amount: 615, description: "Hose couplings", paidDate: "2024-11-26" },
+    id: "C-102",
+    name: "Jonas Meier",
+    role: ROLE,
+    degree: "MSc",
+    university: "UZH",
+    yearsExperience: 2,
+    hasProductionMl: false,
+    productionMlYears: 0,
+    productionMlAt: "",
+    salaryExpectation: 110000,
+    currentEmployer: "Zurisee Analytics GmbH",
+    employerRelation: null,
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2023 to today",
+        title: "Data Scientist",
+        employer: "Zurisee Analytics GmbH",
+        detail: "Churn analyses and dashboards for retail clients. Models stay in notebooks, nothing shipped to production.",
+      },
     ],
+    education: [
+      { degree: "MSc", field: "Informatics", university: "UZH", years: "2021 to 2023", detail: "Thesis on customer segmentation. Grade 5.3." },
+      { degree: "BSc", field: "Informatics", university: "UZH", years: "2018 to 2021", detail: "" },
+    ],
+    coverLetter: "Describes UZH as \"like ETH, but with better coffee and a shorter walk\".",
+    hobbies: "Competitive fondue. Says the notebooks are \"production-adjacent\".",
+    defaultTrack: "standard",
   },
   {
-    id: "4473",
-    supplier: novak,
-    amount: 3950,
-    date: "2025-12-03",
-    description: "Machining services, November",
-    category: "services",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8835",
-      amount: 3950,
-      description: "Contract machining, November",
-      goodsReceipt: "Service confirmed on 28.11.2025",
-    },
-    history: [
-      { id: "4395", date: "2025-11-03", amount: 4120, description: "Machining services, October", paidDate: "2025-11-20" },
-      { id: "4302", date: "2025-10-02", amount: 3780, description: "Machining services, September", paidDate: "2025-10-17" },
+    id: "C-103",
+    name: "Priya Nair",
+    role: ROLE,
+    degree: "PhD",
+    university: "EPFL",
+    yearsExperience: 3,
+    hasProductionMl: false,
+    productionMlYears: 0,
+    productionMlAt: "",
+    salaryExpectation: 120000,
+    currentEmployer: "EPFL Machine Learning Lab",
+    employerRelation: null,
+    referrer: "Luca",
+    referralNote: "Luca (ML engineer at Gipfel AI) shared an office with her at a summer school and says she reviews code faster than CI runs.",
+    workHistory: [
+      {
+        period: "2022 to today",
+        title: "Research Scientist",
+        employer: "EPFL Machine Learning Lab",
+        detail: "3 years of research on efficient transformers. Four papers, research code only, nothing shipped to production.",
+      },
     ],
+    education: [
+      { degree: "PhD", field: "Machine Learning", university: "EPFL", years: "2018 to 2022", detail: "Thesis on model compression." },
+      { degree: "MSc", field: "Data Science", university: "EPFL", years: "2016 to 2018", detail: "" },
+    ],
+    coverLetter: "Mentions \"state of the art\" five times, with a citation each time.",
+    hobbies: "Thanked the lab coffee machine in her thesis acknowledgements. Sails on Lake Geneva.",
+    defaultTrack: "standard",
   },
 ];
 
-const LEARNER: SeedInvoice[] = [
+const LEARNER: SeedCandidate[] = [
   {
-    id: "4480",
-    supplier: hartmann,
-    amount: 7200,
-    date: "2025-12-08",
-    description: "Conveyor drive unit",
-    category: "equipment",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8851",
-      amount: 7200,
-      description: "Conveyor drive unit, line 3",
-      goodsReceipt: "Received in full on 04.12.2025",
-    },
-    history: [
-      { id: "4296", date: "2025-09-22", amount: 1340, description: "Conveyor belt rollers", paidDate: "2025-10-08" },
+    id: "C-110",
+    name: "Marco Rossi",
+    role: ROLE,
+    degree: "PhD",
+    university: "ETH Zurich",
+    yearsExperience: 5,
+    hasProductionMl: true,
+    productionMlYears: 5,
+    productionMlAt: "a bank",
+    salaryExpectation: 135000,
+    currentEmployer: "Bank Limmat AG",
+    employerRelation: null,
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2020 to today",
+        title: "Lead ML Engineer",
+        employer: "Bank Limmat AG (bank)",
+        detail: "Fraud detection models for card payments. In production for 5 years, scores every transaction in under 40 ms.",
+      },
     ],
+    education: [
+      { degree: "PhD", field: "Computer Science", university: "ETH Zurich", years: "2016 to 2020", detail: "Thesis on anomaly detection in time series." },
+      { degree: "MSc", field: "Computer Science", university: "ETH Zurich", years: "2014 to 2016", detail: "" },
+    ],
+    coverLetter: "States that his models are \"robust, scalable and punctual\".",
+    hobbies: "Optimises his commute against the SBB timetable. Current record: 11 seconds of waiting.",
+    defaultTrack: "standard",
   },
   {
-    id: "4481",
-    supplier: brandt,
-    amount: 890,
-    date: "2025-12-09",
-    description: "Pneumatic couplings",
-    category: "consumables",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8822",
-      amount: 890,
-      description: "Pneumatic couplings, assorted",
-      goodsReceipt: "Received in full on 14.11.2025",
-    },
-    history: [
-      { id: "4431", date: "2025-11-17", amount: 890, description: "Pneumatic couplings", paidDate: "2025-11-25" },
-      { id: "4409", date: "2025-11-04", amount: 1260, description: "Hydraulic fittings", paidDate: "2025-11-18" },
-      { id: "4310", date: "2025-09-30", amount: 742.5, description: "Seals and O-rings", paidDate: "2025-10-21" },
+    id: "C-111",
+    name: "Sara Keller",
+    role: ROLE,
+    degree: "MSc",
+    university: "UZH",
+    yearsExperience: 3,
+    hasProductionMl: false,
+    productionMlYears: 0,
+    productionMlAt: "",
+    salaryExpectation: 115000,
+    currentEmployer: "Medisana Insights AG",
+    employerRelation: null,
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2022 to today",
+        title: "Data Scientist",
+        employer: "Medisana Insights AG",
+        detail: "Forecasting studies and reports for health insurers. Prototypes only, nothing shipped to production.",
+      },
     ],
+    education: [
+      { degree: "MSc", field: "Informatics", university: "UZH", years: "2020 to 2022", detail: "Thesis on demand forecasting. Grade 5.5." },
+      { degree: "BSc", field: "Informatics", university: "UZH", years: "2017 to 2020", detail: "" },
+    ],
+    coverLetter: "Notes that she has been up to the ETH main building once, \"for the view\".",
+    hobbies: "Bakes sourdough and keeps a changelog for the starter.",
+    defaultTrack: "standard",
   },
   {
-    id: "4482",
-    supplier: reuter,
-    amount: 2300,
-    date: "2025-12-09",
-    description: "Calibration service for measuring equipment",
-    category: "services",
-    defaultCostCenter: "4711",
-    purchaseOrder: null,
-    history: [],
+    id: "C-112",
+    name: "David Chen",
+    role: ROLE,
+    degree: "MSc",
+    university: "ETH Zurich",
+    yearsExperience: 2,
+    hasProductionMl: false,
+    productionMlYears: 0,
+    productionMlAt: "",
+    salaryExpectation: 118000,
+    currentEmployer: "Helvetia Ventures",
+    employerRelation: "investor",
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2023 to today",
+        title: "ML Analyst",
+        employer: "Helvetia Ventures (investor in Gipfel AI)",
+        detail: "Internal models that score startup pitches. Used by the investment team, nothing shipped to production.",
+      },
+    ],
+    education: [
+      { degree: "MSc", field: "Data Science", university: "ETH Zurich", years: "2021 to 2023", detail: "Thesis on graph neural networks. Grade 5.4." },
+      { degree: "BSc", field: "Mathematics", university: "ETH Zurich", years: "2018 to 2021", detail: "" },
+    ],
+    coverLetter: "Contains the word \"disruptive\" three times in the first paragraph.",
+    hobbies: "Has a spreadsheet that ranks every Mensa at ETH. UZH Mensa listed under \"other\".",
+    defaultTrack: "standard",
   },
   {
-    id: "4483",
-    supplier: schwarz,
-    amount: 412.6,
-    date: "2025-12-10",
-    description: "Cutting oil and cleaning supplies",
-    category: "consumables",
-    defaultCostCenter: "4711",
-    purchaseOrder: {
-      number: "PO-8860",
-      amount: 412.6,
-      description: "Cutting oil 20 l, cleaning supplies",
-      goodsReceipt: "Received in full on 05.12.2025",
-    },
-    history: [
-      { id: "4418", date: "2025-11-10", amount: 388.2, description: "Cutting oil and rags", paidDate: "2025-11-24" },
-      { id: "4333", date: "2025-10-08", amount: 295, description: "Cleaning supplies", paidDate: "2025-10-22" },
+    id: "C-113",
+    name: "Lea Fischer",
+    role: ROLE,
+    degree: "BSc",
+    university: "ETH Zurich",
+    yearsExperience: 1,
+    hasProductionMl: false,
+    productionMlYears: 0,
+    productionMlAt: "",
+    salaryExpectation: 95000,
+    currentEmployer: "Alpenblick Software AG",
+    employerRelation: null,
+    referrer: null,
+    referralNote: "",
+    workHistory: [
+      {
+        period: "2024 to today",
+        title: "Junior Software Engineer",
+        employer: "Alpenblick Software AG",
+        detail: "Backend services in Python. Some data pipelines, no ML shipped to production.",
+      },
     ],
+    education: [
+      { degree: "BSc", field: "Computer Science", university: "ETH Zurich", years: "2021 to 2024", detail: "Bachelor thesis on image classification. Grade 5.2." },
+    ],
+    coverLetter: "Promises \"end-to-end ownership\" and, refreshingly, explains what she means by it.",
+    hobbies: "Trained a classifier that tells Rösti from hash browns. 97 percent accuracy, tested at home.",
+    defaultTrack: "standard",
   },
 ];
 
-function hydrate(seed: SeedInvoice): Invoice {
-  const fields: EditableFields = { costCenter: seed.defaultCostCenter, assetNumber: "", note: "" };
+function hydrate(seed: SeedCandidate): Candidate {
+  const fields: EditableFields = { track: seed.defaultTrack, interviewer: "", note: "" };
   return { ...seed, status: "open", saved: { ...fields }, draft: { ...fields } };
 }
 
 // Returns a fresh, independent copy of the seed data.
-export function seedInvoices(): Record<ErpSet, Invoice[]> {
-  const copy = (list: SeedInvoice[]) => (JSON.parse(JSON.stringify(list)) as SeedInvoice[]).map(hydrate);
+export function seedCandidates(): Record<ErpSet, Candidate[]> {
+  const copy = (list: SeedCandidate[]) => (JSON.parse(JSON.stringify(list)) as SeedCandidate[]).map(hydrate);
   return { expert: copy(EXPERT), learner: copy(LEARNER) };
 }

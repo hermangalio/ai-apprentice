@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Frame, Prediction, Scorecard, ScreenEvent, ScreenMoment, Session, WorkMap } from "@/lib/types";
-import type { ErpControlMessage } from "@/lib/erp/events";
-import { wantsModelCheck } from "@/lib/teach/check";
+import { ERP_HIGHLIGHT_FIELDS, type ErpControlMessage } from "@/lib/erp/events";
+import { caseIdOf, caseParts, factNames, highlightField, wantsModelCheck } from "@/lib/teach/check";
 import { createCueTracker, createOnce, isTypingPing, type TrackUpdate } from "@/lib/teach/cues";
 import type { CheckResponse, PredictionCue } from "@/lib/teach/engine";
 import type { Progress, ScoreItem } from "@/lib/teach/progress";
@@ -15,7 +15,7 @@ import { ScorecardView } from "./ScorecardView";
 // The tutor side panel. It polls the learner session, checks every new event
 // against the Work Map and shows the intervention as text, so it works with
 // no voice connected. With voice, `onIntervention` hands the same instruction
-// to the voice agent. Each intervention is also sent to the ERP tab as a
+// to the voice agent. Each intervention is also sent to the sandbox tab as a
 // coach message, so the learner sees it where they work.
 
 export type VoiceWiring = { sessionId: string; context: string; clientTools: TutorClientTools };
@@ -31,7 +31,7 @@ export type TeachPanelProps = {
   // instruction text for the voice agent (pass it to VoicePanel's speak()).
   onIntervention?: (instruction: string, cue: TutorCue) => void;
   // Called when open interventions are settled: the learner corrected the
-  // value (guardrailIds), or the invoice was committed or left (all).
+  // value (guardrailIds), or the case was committed or left (all).
   onSettled?: (guardrailIds: string[], all: boolean) => void;
   // Called once per new learner screen event (typing pings left out), for
   // the voice agent's "Screen:" lines.
@@ -59,16 +59,9 @@ const ERP_CONTROL = "erp-control";
 // Stored events older than this are history: no "Screen:" line, no model call.
 const RECENT_MS = 15000;
 
-// Guardrail fact names to the field names the ERP can highlight.
-const HIGHLIGHT: Record<string, string> = {
-  supplier_known: "supplier",
-  supplier_is_group_company: "supplier",
-  invoice_month: "date",
-};
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const eur = (n?: number) => (n === undefined ? "" : `EUR ${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
-
-type ActiveCue = PredictionCue & { invoiceId?: string; t: number; answer: string; revealed: boolean };
+type ActiveCue = PredictionCue & { caseId?: string; t: number; answer: string; revealed: boolean };
 
 export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSettled, onLearnerEvent }: TeachPanelProps) {
   const [full, setFull] = useState<FullState | null>(null);
@@ -88,12 +81,12 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
   const onSettledRef = useRef(onSettled);
   const onLearnerEventRef = useRef(onLearnerEvent);
   const tracker = useRef(createCueTracker());
-  // Guardrail of the coach message currently shown in the ERP tab.
+  // Guardrail of the coach message currently shown in the sandbox tab.
   const coachFor = useRef<string | null>(null);
   const screenOnce = useRef(createOnce());
   const modelOnce = useRef(createOnce());
-  // Guardrails the model raised an intervention for on the invoice on screen.
-  const modelRaised = useRef<{ invoiceId?: string; ids: Set<string> }>({ ids: new Set() });
+  // Guardrails the model raised an intervention for on the case on screen.
+  const modelRaised = useRef<{ caseId?: string; ids: Set<string> }>({ ids: new Set() });
   const control = useRef<BroadcastChannel | null>(null);
   const reasonTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -132,7 +125,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
     return body as PanelState;
   }, [learnerSessionId]);
 
-  // Acts on one check result: speak, coach in the ERP tab, show the
+  // Acts on one check result: speak, coach in the sandbox tab, show the
   // prediction question.
   const handleResult = useCallback(
     (res: CheckResponse, event: EventMeta): TrackUpdate => {
@@ -146,15 +139,18 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
       for (const v of res.violations) {
         if (v.repeat) continue;
         onInterventionRef.current?.(v.instruction, { kind: "intervention", guardrailId: v.guardrailId, stepId: v.stepId });
-        const field = v.field ? (HIGHLIGHT[v.field] ?? v.field) : undefined;
+        // The element to highlight comes from the guardrail's check, matched
+        // against the names the sandbox says it can highlight.
+        const g = fullRef.current?.workMap.guardrails.find((x) => x.id === v.guardrailId);
+        const field = (g && highlightField(g, ERP_HIGHLIGHT_FIELDS)) ?? v.field;
         if (field) postControl({ type: "highlight", field });
-        // "broken" is already saved: nothing left to hold back in the ERP.
+        // "broken" is already confirmed: nothing left to hold back in the sandbox.
         postControl({ type: "coach", text: v.question, field, severity: v.severity === "broken" ? "hint" : "stop" });
         coachFor.current = v.guardrailId;
         coached = true;
         setReplay(null);
       }
-      // The learner corrected the value, or committed or left the invoice.
+      // The learner corrected the value, or committed or left the case.
       if (!coached && coachFor.current && (track.all || track.settled.includes(coachFor.current))) {
         postControl({ type: "coach_clear" });
         coachFor.current = null;
@@ -164,9 +160,9 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
         if (!res.prediction.repeat) {
           onInterventionRef.current?.(res.prediction.instruction, { kind: "prediction", stepId: res.prediction.stepId });
         }
-        const next = { ...res.prediction, invoiceId: res.invoiceId, t: event.t, answer: "", revealed: false };
+        const next = { ...res.prediction, caseId: res.caseId, t: event.t, answer: "", revealed: false };
         // The stored copy of an event already checked live must not reset the card.
-        setCue((prev) => (prev && prev.invoiceId === next.invoiceId && prev.stepId === next.stepId ? prev : next));
+        setCue((prev) => (prev && prev.caseId === next.caseId && prev.stepId === next.stepId ? prev : next));
       }
       return track;
     },
@@ -195,7 +191,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
   );
 
   // Second pass for guardrails without a usable `check`. Runs only at an
-  // invoice open or a confirmation step, never blocks the rule result, and
+  // case open or a confirmation step, never blocks the rule result, and
   // adds its findings when they arrive. Rule violations of the same event
   // come back marked as repeats, so nothing is said twice.
   // One more case: a commit that closes an intervention the model raised.
@@ -209,20 +205,20 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
       const closesModelCue =
         event.kind === "action" &&
         event.committed === true &&
-        raised.invoiceId === first.invoiceId &&
+        raised.caseId === first.caseId &&
         first.undecided.some((id) => raised.ids.has(id));
       if (closesModelCue) raised.ids.clear();
       if (!closesModelCue && !wantsModelCheck({ ...event, kind: event.kind })) return;
       if (Date.now() - meta.wall > RECENT_MS) return;
-      const key = `${first.invoiceId ?? ""}|${event.kind}|${event.action ?? ""}|${event.committed === true}`;
+      const key = `${first.caseId ?? ""}|${event.kind}|${event.action ?? ""}|${event.committed === true}`;
       if (!modelOnce.current.first(key, meta.wall)) return;
       void check(event, { model: true })
         .then((res) => {
           if (!res) return;
           handleResult(res, meta);
           if (!closesModelCue) {
-            if (raised.invoiceId !== res.invoiceId) {
-              raised.invoiceId = res.invoiceId;
+            if (raised.caseId !== res.caseId) {
+              raised.caseId = res.caseId;
               raised.ids.clear();
             }
             for (const v of res.violations) if (first.undecided.includes(v.guardrailId)) raised.ids.add(v.guardrailId);
@@ -240,8 +236,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
   const noteLearnerEvent = useCallback((event: LearnerEvent, wall: number) => {
     if (!event.kind || !event.summary || isTypingPing(event)) return;
     if (Date.now() - wall > RECENT_MS) return;
-    const invoice = event.facts?.invoice_id ?? event.entity?.id ?? "";
-    if (!screenOnce.current.first(`${invoice}|${event.kind}|${event.summary}`, wall)) return;
+    if (!screenOnce.current.first(`${caseIdOf(event) ?? ""}|${event.kind}|${event.summary}`, wall)) return;
     onLearnerEventRef.current?.({ kind: event.kind, summary: event.summary });
   }, []);
 
@@ -283,7 +278,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
     };
   }, [refresh, check, handleResult, askModel, noteLearnerEvent]);
 
-  // Fast path: ERP events arrive here over the BroadcastChannel before they
+  // Fast path: sandbox events arrive here over the BroadcastChannel before they
   // reach the server. Check them at once. If no other tab stores the event
   // within a few seconds, store it from here so progress still works.
   useEffect(() => {
@@ -316,7 +311,7 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
             (e.action ?? "") === (data.action ?? "") &&
             // The request and the confirmation of an action differ only here.
             (e.committed === true) === (data.committed === true) &&
-            (e.facts?.invoice_id ?? e.entity?.id ?? "") === (data.facts?.invoice_id ?? data.entity?.id ?? "") &&
+            (caseIdOf(e) ?? "") === (caseIdOf(data) ?? "") &&
             Math.abs(e.t - t) < 4000,
         );
         if (!stored) void check(event, { persist: true }).then(() => refresh().catch(() => {}));
@@ -399,13 +394,17 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
   const who = workMap.expertName;
   const guardrailById = new Map(workMap.guardrails.map((g) => [g.id, g]));
   const facts = progress.facts;
+  // The case header is built from whatever facts the events carry.
+  const caseType = progress.caseType;
+  const parts = caseParts(facts, factNames(workMap));
+  const status = typeof facts.status === "string" ? facts.status.replace(/_/g, " ") : undefined;
 
-  const here = interventions.filter((i) => i.invoiceId && i.invoiceId === progress.invoiceId);
+  const here = interventions.filter((i) => i.caseId && i.caseId === progress.caseId);
   const active = here[here.length - 1];
   const earlier = interventions.filter((i) => i !== active).reverse();
   const cueVisible =
     cue &&
-    cue.invoiceId === progress.invoiceId &&
+    cue.caseId === progress.caseId &&
     !progress.closed &&
     !here.some((i) => i.guardrailId === cue.guardrailId) &&
     !predictions.some((p) => p.stepId === cue.stepId && p.t >= cue.t);
@@ -444,31 +443,30 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
           <>
             {/* The case on screen */}
             <section className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
-              {progress.invoiceId ? (
+              {progress.caseId ? (
                 <>
                   <div className="flex items-baseline justify-between gap-2">
-                    <h2 className="text-sm font-semibold">Invoice {progress.invoiceId}</h2>
-                    <span className="text-xs text-stone-500">{progress.closed ? facts.status?.replace(/_/g, " ") ?? "closed" : "open"}</span>
+                    <h2 className="text-sm font-semibold">
+                      {cap(caseType)} {progress.caseId}
+                    </h2>
+                    <span className="text-xs text-stone-500">{progress.closed ? (status ?? "closed") : "open"}</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-stone-600">
-                    {[facts.supplier, eur(facts.amount), facts.category].filter(Boolean).join(" · ")}
-                  </p>
-                  <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-                    {facts.cost_center && (
-                      <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono">cost center {facts.cost_center}</span>
-                    )}
-                    {facts.asset_number && (
-                      <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono">asset {facts.asset_number}</span>
-                    )}
-                    {facts.supplier_known === false && (
-                      <span className="rounded bg-stone-100 px-1.5 py-0.5">new supplier</span>
-                    )}
-                  </p>
-                  {progress.closed && <p className="mt-1.5 text-xs text-stone-500">Done. Open the next invoice in the ERP.</p>}
+                  {parts.length > 0 && (
+                    <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                      {parts.map((part) => (
+                        <span key={part} className="rounded bg-stone-100 px-1.5 py-0.5">
+                          {part}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  {progress.closed && (
+                    <p className="mt-1.5 text-xs text-stone-500">Done. Open the next {caseType} in the other tab.</p>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-stone-600">
-                  Waiting for the first invoice. Open one in the ERP tab and work it as you would on your own.
+                  Waiting for the first case. Open one in the other tab and work it as you would on your own.
                 </p>
               )}
             </section>
@@ -488,10 +486,10 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                 <section className={`rounded-lg border-2 px-3 py-3 ${tone}`} aria-live="assertive">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-700">
                     {settled
-                      ? "Corrected before saving"
+                      ? "Corrected before confirming"
                       : broken
-                        ? "Saved against a rule · on your practice list"
-                        : "Stop · not saved yet"}
+                        ? "Confirmed against a rule · on your practice list"
+                        : "Stop · not confirmed yet"}
                   </p>
                   <p className="mt-1.5 text-base font-semibold leading-snug">{active.question}</p>
                   {!shown ? (
@@ -702,9 +700,9 @@ export function TeachPanel({ learnerSessionId, voiceSlot, onIntervention, onSett
                         }`}
                       />
                       <span className="text-stone-700">
-                        Invoice {i.invoiceId ?? "?"}: {guardrailById.get(i.guardrailId)?.rule ?? i.guardrailId}{" "}
+                        {cap(i.caseType ?? caseType)} {i.caseId ?? "?"}: {guardrailById.get(i.guardrailId)?.rule ?? i.guardrailId}{" "}
                         <span className="text-stone-500">
-                          ({i.outcome === "corrected" ? "corrected" : i.outcome === "overridden" ? "saved anyway" : "open"})
+                          ({i.outcome === "corrected" ? "corrected" : i.outcome === "overridden" ? "went ahead anyway" : "open"})
                         </span>
                       </span>
                     </li>

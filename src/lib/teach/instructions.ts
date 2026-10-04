@@ -14,18 +14,21 @@ export function interventionQuestion(workMap: WorkMap, severity: Severity): stri
     : `${workMap.expertName} would stop here. Why do you think?`;
 }
 
+// How to name the case: what the application calls it, its id, and the fact
+// names the guardrails look at.
+export type CaseRef = { type?: string; id?: string; relevant?: readonly string[] };
+
 // What the learner is doing, in one sentence, for the tutor.
-function situation(event: ScreenEvent, facts: CaseFacts, severity: Severity): string {
-  const c = describeCase(facts);
+function situation(event: ScreenEvent, facts: CaseFacts, severity: Severity, about: CaseRef): string {
+  const c = describeCase(facts, about);
   if (event.action) {
     const verb = actionWord(event.action);
-    const cc = facts.cost_center ? ` with cost center ${facts.cost_center}` : "";
     return severity === "broken"
-      ? `The learner has already chosen to ${verb} ${c}${cc}.`
-      : `The learner is about to ${verb} ${c}${cc}.`;
+      ? `The learner has already chosen to ${verb} ${c}.`
+      : `The learner pressed "${verb}" and is about to ${verb} ${c}. The confirmation is still open.`;
   }
   if (event.kind === "field_change" && event.field) {
-    return `The learner set ${event.field.replace(/_/g, " ")} to ${event.after || "empty"} on ${c}. It is not saved yet.`;
+    return `The learner set ${event.field.replace(/_/g, " ")} to ${event.after || "empty"} on ${c}. It is not confirmed yet.`;
   }
   return `The learner is working on ${c}.`;
 }
@@ -36,16 +39,17 @@ export function interventionInstruction(
   event: ScreenEvent,
   facts: CaseFacts,
   severity: Severity,
+  about: CaseRef = {},
 ): string {
   const question = interventionQuestion(workMap, severity);
   const who = workMap.expertName;
   const head = severity === "broken" ? `BROKEN guardrail ${g.id}.` : `INTERVENE guardrail ${g.id}.`;
   const parts = [
     head,
-    situation(event, facts, severity),
+    situation(event, facts, severity, about),
     severity === "broken"
-      ? `It is already saved, so do not scold. Ask first: "${question}"`
-      : `Speak now, before it is saved. Ask first: "${question}"`,
+      ? `It is already confirmed, so do not scold. Ask first: "${question}"`
+      : `Speak now, before it is confirmed. Ask first: "${question}"`,
     `Then give ${who}'s reason in ${who}'s own words: "${g.quote.text}"`,
     g.escalateTo ? `Say who to go to: ${g.escalateTo}.` : "",
     `Then call show_expert_moment with guardrail_id ${g.id}.`,
@@ -61,19 +65,24 @@ export function interventionMessage(workMap: WorkMap, g: Guardrail, severity: Se
   return `${interventionQuestion(workMap, severity)} ${workMap.expertName}: "${g.quote.text}"`;
 }
 
-export function predictionPrompt(workMap: WorkMap): string {
-  return `Before you touch anything: what would ${workMap.expertName} do with this invoice, and why?`;
+export function predictionPrompt(workMap: WorkMap, caseType = "case"): string {
+  return `Before you touch anything: what would ${workMap.expertName} do with this ${caseType}, and why?`;
 }
 
 // `g` is the guardrail at stake on this case; its rule is the answer.
-export function predictionInstruction(workMap: WorkMap, step: WorkStep, g: Guardrail, facts: CaseFacts): string {
+export function predictionInstruction(
+  workMap: WorkMap,
+  step: WorkStep,
+  g: Guardrail,
+  facts: CaseFacts,
+  about: CaseRef = {},
+): string {
   const who = workMap.expertName;
-  const defaults = facts.cost_center ? ` The default cost center is ${facts.cost_center}.` : "";
   return [
     `PREDICT step ${step.id} ("${step.title}").`,
-    `The learner just opened ${describeCase(facts)}.${defaults}`,
+    `The learner just opened ${describeCase(facts, about)}. Nothing has been changed yet.`,
     `Guardrail ${g.id} applies to this case: ${g.rule}`,
-    `Do not reveal it yet. Ask: "${predictionPrompt(workMap)}"`,
+    `Do not reveal it yet. Ask: "${predictionPrompt(workMap, about.type)}"`,
     `Wait for the answer. Then say what ${who} would do and give the reason in ${who}'s own words: "${g.quote.text}"`,
     `Then call log_prediction with step_id ${step.id}, the prompt, the learner's answer, and whether it was correct.`,
   ].join(" ");
@@ -92,7 +101,7 @@ export function tutorContext(workMap: WorkMap): string {
   lines.push("");
   lines.push("HOW TO COACH");
   lines.push(
-    `- The learner works real cases in the ERP in another tab. You are told what they do through messages that start with INTERVENE, BROKEN or PREDICT. Follow those messages exactly and at once.`,
+    `- The learner works real cases in the application in another tab. You are told what they do through messages that start with INTERVENE, BROKEN or PREDICT. Follow those messages exactly and at once.`,
   );
   lines.push(`- Explain each step the way ${who} did. Quote ${who}'s words where a quote is given, and say that they are ${who}'s words.`);
   lines.push(`- Before a judgment step, ask the learner to predict what ${who} would do. Reveal the decision and the reason only after they answer. Then call log_prediction.`);

@@ -19,8 +19,8 @@ export default function Home() {
           </Link>
         ))}
       </div>
-      <Link href="/erp" className="text-sm underline">
-        Sandbox ERP
+      <Link href="/hiring?set=expert" className="text-sm underline">
+        Hiring desk sandbox
       </Link>
     </main>
   );

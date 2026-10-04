@@ -115,7 +115,7 @@ const endT = Math.max(...events.map((e) => e.t)) + 30_000;
 // Events an apprentice would want to ask about (the replay does not call the
 // question selector; it only needs to know whether something is pending).
 const judgment = events.filter(
-  (e) => e.kind === "field_change" || (e.kind === "action" && e.committed !== false && !/posted|requested/i.test(e.summary)),
+  (e) => e.kind === "field_change" || (e.kind === "action" && e.committed !== false && !/requested/i.test(e.summary)),
 );
 
 console.log(`\nreplay of ${path.basename(dir)}: ${recorded.length} recorded events, ${events.length} without repeats, ${frames.length} frames, ${speech.length} capture utterances`);

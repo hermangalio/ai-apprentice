@@ -3,7 +3,7 @@
     "id": "evt_01",
     "t": 12000,
     "kind": "open",
-    "summary": "Invoice queue opened, 3 open invoices",
+    "summary": "Application queue opened, 3 open applications",
     "frameId": "frm_01",
     "source": "vision"
   },
@@ -11,132 +11,286 @@
     "id": "evt_02",
     "t": 31000,
     "kind": "open",
-    "summary": "Invoice 4471 opened (Kessler Werkzeugtechnik, EUR 6,840.00)",
+    "summary": "Application C-101 opened (Nina Baumann, MSc ETH Zurich, ML Engineer)",
     "frameId": "frm_02",
-    "source": "vision",
+    "source": "dom",
     "entity": {
-      "type": "invoice",
-      "id": "4471"
+      "type": "candidate",
+      "id": "C-101"
+    },
+    "facts": {
+      "candidate_id": "C-101",
+      "name": "Nina Baumann",
+      "role": "ML Engineer",
+      "university": "ETH Zurich",
+      "degree": "MSc",
+      "years_experience": 4,
+      "has_production_ml": true,
+      "salary_expectation": 125000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_03",
     "t": 58000,
     "kind": "navigate",
-    "summary": "Purchase order PO-8812 opened next to invoice 4471",
+    "summary": "Work history of C-101 opened, 4 years of production ML at a logistics company visible",
     "frameId": "frm_03",
-    "source": "vision",
+    "source": "dom",
     "entity": {
-      "type": "invoice",
-      "id": "4471"
+      "type": "candidate",
+      "id": "C-101"
+    },
+    "facts": {
+      "candidate_id": "C-101",
+      "name": "Nina Baumann",
+      "role": "ML Engineer",
+      "university": "ETH Zurich",
+      "degree": "MSc",
+      "years_experience": 4,
+      "has_production_ml": true,
+      "salary_expectation": 125000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_04",
     "t": 192000,
     "kind": "field_change",
-    "summary": "Cost center changed from 4711 to 0400",
+    "summary": "Track changed from Standard loop to Fast track",
     "frameId": "frm_04",
-    "source": "vision",
-    "field": "cost_center",
-    "before": "4711",
-    "after": "0400",
+    "source": "dom",
+    "field": "track",
+    "before": "standard",
+    "after": "fast",
+    "committed": false,
     "entity": {
-      "type": "invoice",
-      "id": "4471"
+      "type": "candidate",
+      "id": "C-101"
+    },
+    "facts": {
+      "candidate_id": "C-101",
+      "name": "Nina Baumann",
+      "role": "ML Engineer",
+      "university": "ETH Zurich",
+      "degree": "MSc",
+      "years_experience": 4,
+      "has_production_ml": true,
+      "salary_expectation": 125000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "fast",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_05",
     "t": 224000,
     "kind": "field_change",
-    "summary": "Asset number set to A-2291",
+    "summary": "Interviewer set to Reto",
     "frameId": "frm_05",
-    "source": "vision",
-    "field": "asset_number",
+    "source": "dom",
+    "field": "interviewer",
     "before": "",
-    "after": "A-2291",
+    "after": "Reto",
+    "committed": false,
     "entity": {
-      "type": "invoice",
-      "id": "4471"
+      "type": "candidate",
+      "id": "C-101"
+    },
+    "facts": {
+      "candidate_id": "C-101",
+      "name": "Nina Baumann",
+      "role": "ML Engineer",
+      "university": "ETH Zurich",
+      "degree": "MSc",
+      "years_experience": 4,
+      "has_production_ml": true,
+      "salary_expectation": 125000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "fast",
+      "interviewer": "Reto",
+      "status": "open"
     }
   },
   {
     "id": "evt_06",
     "t": 236000,
     "kind": "action",
-    "summary": "Invoice 4471 posted",
+    "summary": "Application C-101 advanced to interview",
     "frameId": "frm_06",
-    "source": "vision",
-    "action": "save",
+    "source": "dom",
+    "action": "advance",
     "committed": true,
     "entity": {
-      "type": "invoice",
-      "id": "4471"
+      "type": "candidate",
+      "id": "C-101"
+    },
+    "facts": {
+      "candidate_id": "C-101",
+      "name": "Nina Baumann",
+      "role": "ML Engineer",
+      "university": "ETH Zurich",
+      "degree": "MSc",
+      "years_experience": 4,
+      "has_production_ml": true,
+      "salary_expectation": 125000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "fast",
+      "interviewer": "Reto",
+      "status": "advanced"
     }
   },
   {
     "id": "evt_07",
     "t": 268000,
     "kind": "open",
-    "summary": "Invoice 4472 opened (Brandt Industriebedarf, EUR 1,260.00, dated 02.12.)",
+    "summary": "Application C-102 opened (Jonas Meier, MSc UZH, ML Engineer)",
     "frameId": "frm_07",
-    "source": "vision",
+    "source": "dom",
     "entity": {
-      "type": "invoice",
-      "id": "4472"
+      "type": "candidate",
+      "id": "C-102"
+    },
+    "facts": {
+      "candidate_id": "C-102",
+      "name": "Jonas Meier",
+      "role": "ML Engineer",
+      "university": "UZH",
+      "degree": "MSc",
+      "years_experience": 2,
+      "has_production_ml": false,
+      "salary_expectation": 110000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_08",
     "t": 301000,
     "kind": "navigate",
-    "summary": "Supplier history for Brandt opened, invoice 4409 for EUR 1,260.00 visible",
+    "summary": "Education of C-102 opened, MSc Informatics at UZH visible",
     "frameId": "frm_08",
-    "source": "vision",
+    "source": "dom",
     "entity": {
-      "type": "invoice",
-      "id": "4472"
+      "type": "candidate",
+      "id": "C-102"
+    },
+    "facts": {
+      "candidate_id": "C-102",
+      "name": "Jonas Meier",
+      "role": "ML Engineer",
+      "university": "UZH",
+      "degree": "MSc",
+      "years_experience": 2,
+      "has_production_ml": false,
+      "salary_expectation": 110000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_09",
     "t": 322000,
     "kind": "action",
-    "summary": "Invoice 4472 put on hold",
+    "summary": "Application C-102 put on hold",
     "frameId": "frm_09",
-    "source": "vision",
+    "source": "dom",
     "action": "hold",
     "committed": true,
     "entity": {
-      "type": "invoice",
-      "id": "4472"
+      "type": "candidate",
+      "id": "C-102"
+    },
+    "facts": {
+      "candidate_id": "C-102",
+      "name": "Jonas Meier",
+      "role": "ML Engineer",
+      "university": "UZH",
+      "degree": "MSc",
+      "years_experience": 2,
+      "has_production_ml": false,
+      "salary_expectation": 110000,
+      "referred_by_employee": false,
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "on_hold"
     }
   },
   {
     "id": "evt_10",
     "t": 371000,
     "kind": "open",
-    "summary": "Invoice 4473 opened (Novák Strojírna s.r.o., EUR 3,950.00)",
+    "summary": "Application C-103 opened (Priya Nair, PhD EPFL, referred by Luca)",
     "frameId": "frm_10",
-    "source": "vision",
+    "source": "dom",
     "entity": {
-      "type": "invoice",
-      "id": "4473"
+      "type": "candidate",
+      "id": "C-103"
+    },
+    "facts": {
+      "candidate_id": "C-103",
+      "name": "Priya Nair",
+      "role": "ML Engineer",
+      "university": "EPFL",
+      "degree": "PhD",
+      "years_experience": 3,
+      "has_production_ml": false,
+      "salary_expectation": 120000,
+      "referred_by_employee": true,
+      "referrer": "Luca",
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "open"
     }
   },
   {
     "id": "evt_11",
     "t": 418000,
     "kind": "action",
-    "summary": "Invoice 4473 sent for second approval",
+    "summary": "Application C-103 escalated to the founders",
     "frameId": "frm_11",
-    "source": "vision",
-    "action": "send_for_approval",
+    "source": "dom",
+    "action": "escalate",
     "committed": true,
     "entity": {
-      "type": "invoice",
-      "id": "4473"
+      "type": "candidate",
+      "id": "C-103"
+    },
+    "facts": {
+      "candidate_id": "C-103",
+      "name": "Priya Nair",
+      "role": "ML Engineer",
+      "university": "EPFL",
+      "degree": "PhD",
+      "years_experience": 3,
+      "has_production_ml": false,
+      "salary_expectation": 120000,
+      "referred_by_employee": true,
+      "referrer": "Luca",
+      "employer_is_partner": false,
+      "track": "standard",
+      "interviewer": "",
+      "status": "escalated"
     }
   }
 ]
