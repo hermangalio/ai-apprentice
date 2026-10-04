@@ -16,6 +16,7 @@ import {
   emitErpEvent,
   fieldChangeSummary,
   formatCHF,
+  gradeLabel,
   queueOpenedSummary,
   referralOpenedSummary,
   trackLabel,
@@ -607,15 +608,21 @@ function CandidateDetail({
             <Fact label="Degree and university" field="university" highlight={highlight}>
               {candidate.degree}, {candidate.university}
             </Fact>
-            <Fact label="Years of experience" highlight={highlight}>
-              {yearsLabel(candidate.yearsExperience)}
+            <div className="col-span-2">
+              <Fact label="Final grade (6.0 is best, 4.0 is the pass mark)" field="final_grade" highlight={highlight}>
+                <span className="font-mono text-4xl font-bold">{gradeLabel(candidate.finalGrade)}</span>
+                {candidate.gradeNote && <span className="ml-3 text-xl font-semibold">{candidate.gradeNote}</span>}
+              </Fact>
+            </div>
+            <Fact label="Work experience" highlight={highlight}>
+              {candidate.yearsExperience === 0 ? "None" : yearsLabel(candidate.yearsExperience)}
             </Fact>
             <Fact label="Salary expectation" highlight={highlight}>
               <span className="font-mono text-2xl">{formatCHF(candidate.salaryExpectation)}</span>
             </Fact>
             <div className="col-span-2">
               <Fact label="Current employer" field="current_employer" highlight={highlight}>
-                {candidate.currentEmployer}
+                {candidate.currentEmployer === "none" ? "None" : candidate.currentEmployer}
                 <EmployerBadge candidate={candidate} />
               </Fact>
             </div>
@@ -752,6 +759,7 @@ function CandidateDetail({
               ? `Production ML: yes, ${yearsLabel(candidate.productionMlYears)} at ${candidate.productionMlAt}`
               : "Production ML: none"}
           </div>
+          {candidate.workHistory.length === 0 && <p className="text-xl font-semibold">No work experience.</p>}
           <ul className="flex flex-col gap-3">
             {candidate.workHistory.map((w) => (
               <li key={`${w.period}-${w.title}`} className="border-b border-slate-300 pb-2">

@@ -18,7 +18,7 @@ const SAMPLE_SPEAK: Record<VoiceMode, string> = {
   interviewer: askInstruction("You changed the track from Standard loop to Fast track. What made you do that?"),
   debrief: "Start",
   tutor:
-    "Guardrail: g_01 is about to be broken. The learner is about to advance application C-110 (4 years of production ML) on the standard track.",
+    "Guardrail: g_01 is about to be broken. The learner is about to advance application C-110 (MSc ETH Zurich) on the standard track.",
 };
 
 export function DevVoice(props: {
@@ -34,7 +34,7 @@ export function DevVoice(props: {
   const [sessionId, setSessionId] = useState("");
   const [context, setContext] = useState("");
   const [speakText, setSpeakText] = useState(SAMPLE_SPEAK.interviewer);
-  const [contextLine, setContextLine] = useState("Screen: Application C-101 opened (MSc ETH Zurich, ML Engineer)");
+  const [contextLine, setContextLine] = useState("Screen: Application C-101 opened (Nina Baumann, BSc ETH Zurich, ML Engineer)");
   const [toolLog, setToolLog] = useState<string[]>([]);
   const [events, setEvents] = useState<ScreenEvent[]>([]);
   const [lastActivityAt, setLastActivityAt] = useState<number | null>(null);

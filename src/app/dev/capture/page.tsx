@@ -63,7 +63,7 @@ export default function DevCapturePage() {
             before: "standard",
             after: "fast",
             committed: false,
-            facts: { candidate_id: "C-101", university: "ETH Zurich", years_experience: 4, has_production_ml: true, track: "fast", interviewer: "", status: "open" },
+            facts: { candidate_id: "C-101", university: "ETH Zurich", degree: "BSc", final_grade: 4.0, years_experience: 0, has_production_ml: false, current_employer: "none", track: "fast", interviewer: "", status: "open" },
             source: "dom",
             wallTime: Date.now(),
           },
