@@ -18,7 +18,9 @@
       "eventIds": [
         "evt_01",
         "evt_02"
-      ]
+      ],
+      "phase": "Review",
+      "owner": "Recruiting"
     },
     {
       "id": "s_02",
@@ -40,7 +42,9 @@
       "guardrailIds": [],
       "eventIds": [
         "evt_03"
-      ]
+      ],
+      "phase": "Review",
+      "owner": "Recruiting"
     },
     {
       "id": "s_03",
@@ -64,7 +68,9 @@
       ],
       "eventIds": [
         "evt_04"
-      ]
+      ],
+      "phase": "Decide",
+      "owner": "Recruiting"
     },
     {
       "id": "s_04",
@@ -88,7 +94,9 @@
       ],
       "eventIds": [
         "evt_05"
-      ]
+      ],
+      "phase": "Decide",
+      "owner": "Recruiting"
     },
     {
       "id": "s_05",
@@ -106,7 +114,9 @@
       ],
       "eventIds": [
         "evt_06"
-      ]
+      ],
+      "phase": "Advance",
+      "owner": "Recruiting"
     },
     {
       "id": "s_06",
@@ -132,7 +142,9 @@
         "evt_07",
         "evt_08",
         "evt_09"
-      ]
+      ],
+      "phase": "Advance",
+      "owner": "Reto, the CTO"
     },
     {
       "id": "s_07",
@@ -157,7 +169,9 @@
       "eventIds": [
         "evt_10",
         "evt_11"
-      ]
+      ],
+      "phase": "Advance",
+      "owner": "The founders"
     }
   ],
   "guardrails": [
@@ -324,5 +338,19 @@
     ]
   },
   "status": "confirmed",
-  "updatedAt": "2026-10-03T14:19:00.000Z"
+  "updatedAt": "2026-10-03T14:19:00.000Z",
+  "phases": [
+    {
+      "name": "Review",
+      "description": "Open the application and read the work history."
+    },
+    {
+      "name": "Decide",
+      "description": "Choose the track and who runs the interview."
+    },
+    {
+      "name": "Advance",
+      "description": "Move the applicant on, or hold them."
+    }
+  ]
 }

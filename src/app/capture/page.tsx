@@ -23,7 +23,7 @@ export default function CapturePage() {
   const stored = usePersonName();
   const [edited, setEdited] = useState<string | null>(null);
   const personName = edited ?? stored ?? DEFAULT_PERSON_NAME;
-  const [task, setTask] = useState("Prepare a project handover");
+  const [task, setTask] = useState("Screen applications for the ML engineer role");
   const [language, setLanguage] = useState("en");
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export default function CapturePage() {
       <PageWaves />
       <div className="mx-auto w-full max-w-5xl">
         <Link
-          href="/map/fixture_sabine"
+          href="/map"
           className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
         >
           <ArrowLeft /> Work maps
@@ -258,8 +258,21 @@ function CaptureSession({ session, language }: { session: Session; language: str
         >
           <ArrowLeft /> Back
         </button>
-        <h1 className="mt-3 text-[40px] font-extrabold leading-tight tracking-tight text-stone-900">{session.task}</h1>
-        <p className="mt-1 text-[17px] text-stone-500">{session.personName}</p>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[40px] font-extrabold leading-tight tracking-tight text-stone-900">{session.task}</h1>
+            <p className="mt-1 text-[17px] text-stone-500">{session.personName}</p>
+          </div>
+          {/* The expert needs the sandbox to do the task in. */}
+          <a
+            href="/hiring?set=expert"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[15px] font-medium text-indigo-600 hover:text-indigo-700"
+          >
+            Open the hiring desk sandbox
+          </a>
+        </div>
 
         {/* Recording status */}
         <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-5 py-4 shadow-[0_1px_2px_rgba(10,37,64,0.04)]">

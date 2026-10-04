@@ -619,11 +619,11 @@ function VoicePanelInner({
               : "Quiet while you work"
           : "Listening";
   const dot = paused
-    ? "bg-zinc-400"
+    ? "bg-stone-400"
     : !connected
     ? status === "error"
       ? "bg-red-500"
-      : "bg-zinc-400"
+      : "bg-stone-400"
     : agentSpeaking
       ? "bg-indigo-500 animate-pulse"
       : gated && !gateOpen
@@ -634,27 +634,27 @@ function VoicePanelInner({
 
   return (
     <section
-      className={`flex min-h-0 flex-col text-sm text-zinc-900 ${bare ? "" : "rounded-xl border border-zinc-200 bg-white"} ${className ?? ""}`}
+      className={`flex min-h-0 flex-col text-sm text-stone-900 ${bare ? "" : "rounded-xl border border-stone-200 bg-white"} ${className ?? ""}`}
       data-voice-status={status}
       data-voice-paused={paused ? "true" : undefined}
     >
       {!bare && (
-      <header className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2">
+      <header className="flex items-center gap-2 border-b border-stone-200 px-3 py-2">
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="font-medium">{LABEL[mode]}</div>
-          <div className="truncate text-xs text-zinc-500" aria-live="polite">
+          <div className="truncate text-xs text-stone-500" aria-live="polite">
             {activity}
             {gated && connected && !paused ? ` · transcript: ${scribe.status}` : ""}
           </div>
         </div>
         {controls &&
           (connected || status === "connecting" ? (
-            <button type="button" onClick={stop} className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50">
+            <button type="button" onClick={stop} className="rounded-lg border border-stone-300 px-2 py-1 text-xs hover:bg-stone-50">
               Stop
             </button>
           ) : (
-            <button type="button" onClick={start} className="rounded-lg bg-zinc-900 px-2 py-1 text-xs text-white hover:bg-zinc-700">
+            <button type="button" onClick={start} className="rounded-lg bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-700">
               Start
             </button>
           ))}
@@ -676,27 +676,27 @@ function VoicePanelInner({
 
       <div ref={scroller} className={`flex-1 space-y-1.5 overflow-y-auto ${bare ? "" : "min-h-24 px-3 py-2"}`}>
         {lines.length === 0 &&
-          (emptyState ?? (bare ? null : <p className="text-xs text-zinc-400">Nothing said yet.</p>))}
+          (emptyState ?? (bare ? null : <p className="text-xs text-stone-400">Nothing said yet.</p>))}
         {lines.map((line) =>
           line.who === "note" ? (
-            <p key={line.id} className="break-words font-mono text-[11px] text-zinc-400">
+            <p key={line.id} className="break-words font-mono text-[11px] text-stone-400">
               {line.text}
             </p>
           ) : (
-            <p key={line.id} className={line.muted ? "text-zinc-400 line-through" : ""}>
-              <span className={`mr-1.5 text-xs font-medium ${line.who === "agent" ? "text-indigo-600" : "text-zinc-500"}`}>
+            <p key={line.id} className={line.muted ? "text-stone-400 line-through" : ""}>
+              <span className={`mr-1.5 text-xs font-medium ${line.who === "agent" ? "text-indigo-600" : "text-stone-500"}`}>
                 {line.who === "agent" ? LABEL[mode] : personName || (human === "learner" ? "Learner" : "Expert")}
               </span>
               {line.text}
             </p>
           ),
         )}
-        {gated && !paused && scribe.partialTranscript && <p className="text-zinc-400">{scribe.partialTranscript}</p>}
+        {gated && !paused && scribe.partialTranscript && <p className="text-stone-400">{scribe.partialTranscript}</p>}
       </div>
 
       {textOnly && (
         <form
-          className="flex gap-2 border-t border-zinc-200 p-2"
+          className="flex gap-2 border-t border-stone-200 p-2"
           onSubmit={(e) => {
             e.preventDefault();
             sendText(draft);
@@ -708,9 +708,9 @@ function VoicePanelInner({
             onChange={(e) => setDraft(e.target.value)}
             placeholder={connected ? "Type what you would say" : "Start the session first"}
             disabled={!connected || paused}
-            className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-2 py-1 text-sm disabled:bg-zinc-100"
+            className="min-w-0 flex-1 rounded-lg border border-stone-300 px-2 py-1 text-sm disabled:bg-stone-100"
           />
-          <button type="submit" disabled={!connected || paused} className="rounded-lg bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-40">
+          <button type="submit" disabled={!connected || paused} className="rounded-lg bg-indigo-600 px-3 py-1 text-xs text-white disabled:opacity-40">
             Send
           </button>
         </form>

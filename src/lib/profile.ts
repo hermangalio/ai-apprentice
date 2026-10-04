@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
 
 const KEY = "apprentice.personName";
 const EVENT = "apprentice:profile";
-export const DEFAULT_PERSON_NAME = "Jamie Davis";
+export const DEFAULT_PERSON_NAME = "Emilie";
 
 export function readPersonName(): string {
   try {

@@ -5,12 +5,23 @@ import { usePathname } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { DEFAULT_PERSON_NAME, usePersonName } from "@/lib/profile";
 
+// The brand mark: a solid A with a triangular counter, in the official violet.
+// Every instance shares one gradient id on purpose — they are identical, and
+// the browser resolves url(#…) to the first one in the document.
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      {/* The A, and the lighter stroke that sweeps across it. */}
-      <path d="M16 3.5 4.6 28h5.6l2.2-5.2h7.2L21.8 28h5.6L16 3.5Zm0 9.9 2.3 5.2h-4.6L16 13.4Z" fill="#1668e0" />
-      <path d="M6.5 13.5C12 9 20 8.2 26.5 11.4" stroke="#6ea8f5" strokeWidth="2.1" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="apprentice-mark" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#4a3cd8" />
+          <stop offset="1" stopColor="#6454ec" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M16 3.2 29.6 28.8h-7l-1.8-4.2h-9.6l-1.8 4.2h-7L16 3.2ZM16 12.4l-3.6 8.2h7.2L16 12.4Z"
+        fill="url(#apprentice-mark)"
+        fillRule="evenodd"
+      />
     </svg>
   );
 }
@@ -26,7 +37,7 @@ export function Wordmark() {
 
 const LINKS = [
   { href: "/#how", label: "How it works" },
-  { href: "/map/fixture_sabine", label: "Work maps" },
+  { href: "/map", label: "Work maps" },
   { href: "/teach", label: "Teach" },
 ];
 
@@ -35,7 +46,7 @@ const LINKS = [
 export function SiteHeader() {
   const pathname = usePathname();
   const personName = usePersonName();
-  if (pathname.startsWith("/erp")) return null;
+  if (pathname.startsWith("/erp") || pathname.startsWith("/hiring")) return null;
   // The capture flow is a focused task: the bar carries only the wordmark and
   // who is recording, as in the design.
   const focused = pathname.startsWith("/capture");

@@ -13,9 +13,23 @@ export type DebriefVoiceSlotProps = {
   sessionId: string;
   context: string;
   clientTools: DebriefClientTools;
+  // The progress card draws its own start button and status, so the panel
+  // is asked for the transcript alone.
+  controls?: boolean;
+  chrome?: "card" | "bare";
+  emptyState?: React.ReactNode;
+  className?: string;
 };
 
-export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoiceSlotProps) {
+export function DebriefVoiceSlot({
+  sessionId,
+  context,
+  clientTools,
+  controls,
+  chrome,
+  emptyState,
+  className,
+}: DebriefVoiceSlotProps) {
   // The agent's prompt addresses the expert by name and names the task. The
   // panel reads both when the conversation starts, so it is mounted once the
   // session has been looked up (or the lookup has failed).
@@ -47,7 +61,7 @@ export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoi
   );
 
   if (!loaded || loaded.sessionId !== sessionId) {
-    return <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-500">Loading the session</p>;
+    return <p className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-500">Loading the session</p>;
   }
   return (
     <VoicePanel
@@ -57,6 +71,10 @@ export function DebriefVoiceSlot({ sessionId, context, clientTools }: DebriefVoi
       clientTools={tools}
       personName={loaded.session?.personName}
       task={loaded.session?.task}
+      controls={controls}
+      chrome={chrome}
+      emptyState={emptyState}
+      className={className}
     />
   );
 }
