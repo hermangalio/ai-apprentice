@@ -25,15 +25,15 @@
     {
       "id": "s_02",
       "index": 2,
-      "title": "Check the work history",
+      "title": "Check the university",
       "moment": {
         "t": 58000,
         "frameId": "frm_03",
-        "label": "00:58, candidate C-101, work history"
+        "label": "00:58, candidate C-101, education"
       },
-      "decision": "Found 4 years of production ML",
+      "decision": "Looked at the university before anything else",
       "reason": {
-        "text": "Okay, first one. Nina, ML engineer. I always look at the work history before anything else.",
+        "text": "Okay, first one. Nina. I always look at the university before anything else.",
         "transcriptId": "tr_01",
         "t": 40000,
         "source": "live"
@@ -57,7 +57,7 @@
       },
       "decision": "Moved from the standard loop to the fast track",
       "reason": {
-        "text": "Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says.",
+        "text": "She's from ETH. ETH goes straight to the founder interview. It doesn't matter what the grades say.",
         "transcriptId": "tr_03",
         "t": 201000,
         "source": "live"
@@ -158,8 +158,8 @@
       "decision": "Escalated the referred application to the founders",
       "reason": {
         "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
-        "transcriptId": "tr_12",
-        "t": 481000,
+        "transcriptId": "tr_14",
+        "t": 561000,
         "source": "debrief"
       },
       "isJudgmentCall": true,
@@ -172,20 +172,49 @@
       ],
       "phase": "Advance",
       "owner": "The founders"
+    },
+    {
+      "id": "s_08",
+      "index": 8,
+      "title": "Fast-track HEC Lausanne applications",
+      "moment": {
+        "t": 470000,
+        "frameId": "frm_13",
+        "label": "07:50, candidate C-104, track field"
+      },
+      "decision": "Moved the HEC Lausanne application to the fast track and advanced it",
+      "reason": {
+        "text": "HEC Lausanne. Best business school in the world. That is always the fast track.",
+        "transcriptId": "tr_10",
+        "t": 506000,
+        "source": "live"
+      },
+      "isJudgmentCall": true,
+      "guardrailIds": [
+        "g_06"
+      ],
+      "eventIds": [
+        "evt_12",
+        "evt_13",
+        "evt_14",
+        "evt_15"
+      ],
+      "phase": "Advance",
+      "owner": "Recruiting"
     }
   ],
   "guardrails": [
     {
       "id": "g_01",
       "stepId": "s_03",
-      "type": "limit",
-      "rule": "Three years or more of machine learning in production always goes on the fast track, whatever the default says.",
+      "type": "exception",
+      "rule": "ETH Zurich applications always go on the fast track, whatever the grades say.",
       "check": {
-        "when": "has_production_ml && years_experience >= 3",
+        "when": "university == 'ETH Zurich'",
         "require": "track == 'fast'"
       },
       "quote": {
-        "text": "Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says.",
+        "text": "She's from ETH. ETH goes straight to the founder interview. It doesn't matter what the grades say.",
         "transcriptId": "tr_03",
         "t": 201000,
         "source": "live"
@@ -222,7 +251,7 @@
       "id": "g_03",
       "stepId": "s_06",
       "type": "exception",
-      "rule": "UZH applications are held until Reto, the CTO, has looked at them himself. He decides when they move.",
+      "rule": "UZH applications are held, however strong the CV, until Reto, the CTO, has looked at them himself. He decides when they move.",
       "escalateTo": "Reto, the CTO",
       "check": {
         "when": "university == 'UZH'",
@@ -230,8 +259,8 @@
       },
       "quote": {
         "text": "Only UZH. Reto, our CTO, looks at those himself once he has had his coffee. He decides, not me.",
-        "transcriptId": "tr_10",
-        "t": 463000,
+        "transcriptId": "tr_12",
+        "t": 543000,
         "source": "debrief"
       },
       "moment": {
@@ -252,8 +281,8 @@
       },
       "quote": {
         "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
-        "transcriptId": "tr_12",
-        "t": 481000,
+        "transcriptId": "tr_14",
+        "t": 561000,
         "source": "debrief"
       },
       "moment": {
@@ -274,8 +303,8 @@
       },
       "quote": {
         "text": "I stop and ask the CEO. I never advance someone from an investor or a customer myself.",
-        "transcriptId": "tr_14",
-        "t": 497000,
+        "transcriptId": "tr_16",
+        "t": 577000,
         "source": "debrief"
       },
       "moment": {
@@ -283,19 +312,40 @@
         "frameId": "frm_06",
         "label": "03:56, candidate C-101 advanced"
       }
+    },
+    {
+      "id": "g_06",
+      "stepId": "s_08",
+      "type": "exception",
+      "rule": "HEC Lausanne applications always go on the fast track: best business school in the world.",
+      "check": {
+        "when": "university == 'HEC Lausanne'",
+        "require": "track == 'fast'"
+      },
+      "quote": {
+        "text": "HEC Lausanne. Best business school in the world. That is always the fast track.",
+        "transcriptId": "tr_10",
+        "t": 506000,
+        "source": "live"
+      },
+      "moment": {
+        "t": 470000,
+        "frameId": "frm_13",
+        "label": "07:50, candidate C-104, track field"
+      }
     }
   ],
   "gaps": [
     {
       "id": "gap_01",
-      "question": "You held the UZH application. Is that for every university, and who decides when it moves?",
+      "question": "You held the UZH application although it was the strongest CV of the four. Is that for every university, and who decides when it moves?",
       "why": "The hold could apply to other universities too, and nobody said who decides when a held application moves.",
       "stepId": "s_06",
       "status": "answered",
       "answer": {
         "text": "Only UZH. Reto, our CTO, looks at those himself once he has had his coffee. He decides, not me.",
-        "transcriptId": "tr_10",
-        "t": 463000,
+        "transcriptId": "tr_12",
+        "t": 543000,
         "source": "debrief"
       }
     },
@@ -307,42 +357,42 @@
       "status": "answered",
       "answer": {
         "text": "Anyone referred by an employee needs a second look from the founders, however good the CV is. It's a conflict of interest rule.",
-        "transcriptId": "tr_12",
-        "t": 481000,
+        "transcriptId": "tr_14",
+        "t": 561000,
         "source": "debrief"
       }
     },
     {
       "id": "gap_03",
       "question": "What do you do when the applicant currently works for one of your investors or customers?",
-      "why": "None of the three applicants worked for an investor or customer, so that case was never seen.",
+      "why": "None of the four applicants worked for an investor or customer, so that case was never seen.",
       "status": "answered",
       "answer": {
         "text": "I stop and ask the CEO. I never advance someone from an investor or a customer myself.",
-        "transcriptId": "tr_14",
-        "t": 497000,
+        "transcriptId": "tr_16",
+        "t": 577000,
         "source": "debrief"
       }
     }
   ],
   "teachBack": {
-    "text": "Let me say it back. You check the work history first. Three or more years of production machine learning goes to the fast track, and needs an interviewer before you advance. UZH applications are held until Reto decides. Referrals from employees go to the founders, and applicants from an investor or customer go to the CEO. Candidates asking for a high salary also go to the founders. Is that right?",
+    "text": "Let me say it back. You look at the university first. ETH and HEC Lausanne go on the fast track whatever the grades say, and need an interviewer before you advance. UZH applications are held until Reto decides. Referrals from employees go to the founders, and applicants from an investor or customer go to the CEO. Candidates asking for a high salary also go to the founders. Is that right?",
     "confirmed": true,
     "corrections": [
       {
         "text": "Almost. The founders step isn't about salary, it's only for referrals. The rest is right.",
-        "transcriptId": "tr_16",
-        "t": 531000,
+        "transcriptId": "tr_18",
+        "t": 611000,
         "source": "debrief"
       }
     ]
   },
   "status": "confirmed",
-  "updatedAt": "2026-10-03T14:19:00.000Z",
+  "updatedAt": "2026-10-03T14:21:00.000Z",
   "phases": [
     {
       "name": "Review",
-      "description": "Open the application and read the work history."
+      "description": "Open the application and check where it comes from."
     },
     {
       "name": "Decide",
@@ -350,7 +400,7 @@
     },
     {
       "name": "Advance",
-      "description": "Move the applicant on, or hold them."
+      "description": "Move the applicant on, hold them, or hand them over."
     }
   ]
 }

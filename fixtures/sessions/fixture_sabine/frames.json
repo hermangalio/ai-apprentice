@@ -53,5 +53,25 @@
     "id": "frm_11",
     "t": 418000,
     "file": "frames/frm_11.jpg"
+  },
+  {
+    "id": "frm_12",
+    "t": 450000,
+    "file": "frames/frm_12.jpg"
+  },
+  {
+    "id": "frm_13",
+    "t": 470000,
+    "file": "frames/frm_13.jpg"
+  },
+  {
+    "id": "frm_14",
+    "t": 488000,
+    "file": "frames/frm_14.jpg"
+  },
+  {
+    "id": "frm_15",
+    "t": 497000,
+    "file": "frames/frm_15.jpg"
   }
 ]

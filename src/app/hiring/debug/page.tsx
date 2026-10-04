@@ -61,7 +61,7 @@ export default function HiringDebugPage() {
         >
           stop
         </button>
-        <button type="button" className="rounded border border-slate-900 px-2 py-1 text-sm" onClick={() => send({ type: "coach", text: "Check the work history.", severity: "hint" })}>
+        <button type="button" className="rounded border border-slate-900 px-2 py-1 text-sm" onClick={() => send({ type: "coach", text: "Check the university.", severity: "hint" })}>
           hint
         </button>
         <button type="button" className="rounded border border-slate-900 px-2 py-1 text-sm" onClick={() => send({ type: "coach_clear" })}>

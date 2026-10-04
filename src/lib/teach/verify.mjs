@@ -40,20 +40,21 @@ function expect(name, got, want) {
 
 // The learner set of the sandbox (src/lib/erp/seed.ts), as the facts it sends.
 const CASES = {
-  "C-110": { candidate_id: "C-110", name: "Marco Rossi", role: "ML Engineer", university: "ETH Zurich", degree: "PhD", years_experience: 5, has_production_ml: true, salary_expectation: 135000, referred_by_employee: false, current_employer: "Bank Limmat AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
-  "C-111": { candidate_id: "C-111", name: "Sara Keller", role: "ML Engineer", university: "UZH", degree: "MSc", years_experience: 3, has_production_ml: false, salary_expectation: 115000, referred_by_employee: false, current_employer: "Medisana Insights AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
-  "C-112": { candidate_id: "C-112", name: "David Chen", role: "ML Engineer", university: "ETH Zurich", degree: "MSc", years_experience: 2, has_production_ml: false, salary_expectation: 118000, referred_by_employee: false, current_employer: "Helvetia Ventures", employer_is_partner: true, track: "standard", interviewer: "", status: "open" },
-  "C-113": { candidate_id: "C-113", name: "Lea Fischer", role: "ML Engineer", university: "ETH Zurich", degree: "BSc", years_experience: 1, has_production_ml: false, salary_expectation: 95000, referred_by_employee: false, current_employer: "Alpenblick Software AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
+  "C-110": { candidate_id: "C-110", name: "Marco Rossi", role: "ML Engineer", university: "ETH Zurich", degree: "MSc", final_grade: 4.25, years_experience: 1, has_production_ml: false, salary_expectation: 120000, referred_by_employee: false, current_employer: "Alpenblick Software AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
+  "C-111": { candidate_id: "C-111", name: "Sara Keller", role: "ML Engineer", university: "UZH", degree: "PhD", final_grade: 6.0, years_experience: 8, has_production_ml: true, salary_expectation: 115000, referred_by_employee: false, current_employer: "Medisana Insights AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
+  "C-112": { candidate_id: "C-112", name: "David Chen", role: "ML Engineer", university: "EPFL", degree: "MSc", final_grade: 5.0, years_experience: 2, has_production_ml: false, salary_expectation: 118000, referred_by_employee: false, current_employer: "Helvetia Ventures", employer_is_partner: true, track: "standard", interviewer: "", status: "open" },
+  "C-113": { candidate_id: "C-113", name: "Lea Fischer", role: "ML Engineer", university: "University of Bern", degree: "MSc", final_grade: 5.0, years_experience: 2, has_production_ml: false, salary_expectation: 105000, referred_by_employee: false, current_employer: "Aare Software AG", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
+  "C-114": { candidate_id: "C-114", name: "Chloé Martin", role: "ML Engineer", university: "HEC Lausanne", degree: "BSc", final_grade: 4.0, years_experience: 0, has_production_ml: false, salary_expectation: 135000, referred_by_employee: false, current_employer: "none", employer_is_partner: false, track: "standard", interviewer: "", status: "open" },
 };
 const HIGHLIGHTABLE = ["track", "interviewer", "university", "work_history", "referral", "current_employer", "advance", "hold", "escalate", "reject"];
 
 console.log("== Part 1: evaluator ==");
 const marco = CASES["C-110"];
 expect(`expert name comes from the Work Map`, who, "Emilie");
-expect("g_01 when, 5 years of production ML", evaluate(g.g_01.check.when, marco), true);
-expect("g_01 when, exactly 3 years", evaluate(g.g_01.check.when, { ...marco, years_experience: 3 }), true);
-expect("g_01 when, 2 years", evaluate(g.g_01.check.when, { ...marco, years_experience: 2 }), false);
-expect("g_01 when, 5 years but no production ML", evaluate(g.g_01.check.when, { ...marco, has_production_ml: false }), false);
+expect("g_01 when, ETH Zurich with final grade 4.25", evaluate(g.g_01.check.when, marco), true);
+expect("g_01 when, ETH Zurich with final grade 6.0", evaluate(g.g_01.check.when, { ...marco, final_grade: 6.0 }), true);
+expect("g_01 when, UZH", evaluate(g.g_01.check.when, { ...marco, university: "UZH" }), false);
+expect("g_01 when, HEC Lausanne", evaluate(g.g_01.check.when, { ...marco, university: "HEC Lausanne" }), false);
 expect("g_01 require, track standard", evaluate(g.g_01.check.require, marco), false);
 expect("g_01 require, track fast", evaluate(g.g_01.check.require, { ...marco, track: "fast" }), true);
 expect("g_01 require, track research", evaluate(g.g_01.check.require, { ...marco, track: "research" }), false);
@@ -75,12 +76,17 @@ expect("g_05 when, employer is not a partner", evaluate(g.g_05.check.when, { emp
 expect("g_05 forbid, advance", evaluate(g.g_05.check.forbid, { action: "advance" }), true);
 expect("g_05 forbid, hold", evaluate(g.g_05.check.forbid, { action: "hold" }), false);
 expect("g_05 forbid, escalate", evaluate(g.g_05.check.forbid, { action: "escalate" }), false);
+expect("g_06 when, HEC Lausanne", evaluate(g.g_06.check.when, CASES["C-114"]), true);
+expect("g_06 when, ETH Zurich", evaluate(g.g_06.check.when, marco), false);
+expect("g_06 when, University of Bern", evaluate(g.g_06.check.when, CASES["C-113"]), false);
+expect("g_06 require, track standard", evaluate(g.g_06.check.require, CASES["C-114"]), false);
+expect("g_06 require, track fast", evaluate(g.g_06.check.require, { ...CASES["C-114"], track: "fast" }), true);
 expect("parentheses and ||", evaluate("(a == 1 || b == 2) && !c", { a: 0, b: 2, c: "" }), true);
 expect("<= and >=", evaluate("n >= 3 && n <= 3", { n: 3 }), true);
 expect("!= and double quotes", evaluate('track != "fast"', { track: "standard" }), true);
 expect("two strings compare as strings", evaluate("code == '007'", { code: "7" }), false);
-expect("partial facts: unknown identifier", evaluate(g.g_01.check.when, { has_production_ml: true }, new Set(["has_production_ml"])) === UNKNOWN, true);
-expect("partial facts: false && unknown is false", evaluate(g.g_01.check.when, { has_production_ml: false }, new Set(["has_production_ml"])), false);
+expect("partial facts: unknown identifier", evaluate(g.g_02.check.forbid, { action: "advance" }, new Set(["action"])) === UNKNOWN, true);
+expect("partial facts: false && unknown is false", evaluate(g.g_02.check.forbid, { action: "hold" }, new Set(["action"])), false);
 expect("identifiers", identifiers(g.g_02.check.forbid), ["action", "interviewer"]);
 expect("action names in a check", [actionLiterals(g.g_02.check.forbid), actionLiterals(g.g_03.check.require), actionLiterals(g.g_01.check.require)], [["advance"], ["hold"], []]);
 let threw = false;
@@ -98,15 +104,15 @@ console.log(`checkEvent over ${workMap.guardrails.length} guardrails: ${((perfor
 
 console.log("\n== Part 1a: nothing about the workflow is built in ==");
 {
-  expect("fact names come from the checks", factNames(workMap), ["has_production_ml", "years_experience", "track", "interviewer", "university", "referred_by_employee", "employer_is_partner"]);
+  expect("fact names come from the checks", factNames(workMap), ["university", "track", "interviewer", "referred_by_employee", "employer_is_partner"]);
   expect(
     "case description is built from the facts present",
     describeCase(marco, { type: "candidate", id: "C-110", relevant: factNames(workMap) }),
-    "candidate C-110 (Marco Rossi, role ML Engineer, university ETH Zurich, degree PhD, years experience 5, has production ml, salary expectation 135000, current employer Bank Limmat AG, track standard, no interviewer)",
+    "candidate C-110 (Marco Rossi, role ML Engineer, university ETH Zurich, degree MSc, final grade 4.25, years experience 1, salary expectation 120000, current employer Alpenblick Software AG, track standard, no interviewer)",
   );
   expect("case description without an entity uses the id fact", describeCase({ order_id: "7731", weight_kg: 42 }), "order 7731 (weight kg 42)");
-  expect("guardrail field comes from the check", workMap.guardrails.map(guardrailField), ["track", "interviewer", "university", "referred_by_employee", "employer_is_partner"]);
-  expect("highlight target is matched against what the sandbox can highlight", workMap.guardrails.map((x) => highlightField(x, HIGHLIGHTABLE)), ["track", "interviewer", "university", "referral", "current_employer"]);
+  expect("guardrail field comes from the check", workMap.guardrails.map(guardrailField), ["track", "interviewer", "university", "referred_by_employee", "employer_is_partner", "track"]);
+  expect("highlight target is matched against what the sandbox can highlight", workMap.guardrails.map((x) => highlightField(x, HIGHLIGHTABLE)), ["track", "interviewer", "university", "referral", "current_employer", "track"]);
 
   const ev = (over) => ({ id: "u", t: 10, summary: "", source: "dom", entity: { type: "candidate", id: "C-110" }, facts: marco, ...over });
   const v = (r) => r.violations.map((x) => `${x.guardrail.id}:${x.severity}`);
@@ -240,17 +246,17 @@ const ids = (out) => out.violations.map((v) => `${v.guardrailId}:${v.severity}`)
 const risk = (out) => out.atRisk.map((x) => x.id);
 const requested = (id, action, word) => ({ kind: "action", action, committed: false, summary: `${word} of application ${id} requested, confirmation open` });
 
-console.log("\n-- A. C-110 Marco Rossi, PhD ETH Zurich, 5 years of production ML, default track standard --");
-let r = await send("open C-110 with the default track", "C-110", {}, { kind: "open", summary: "Application C-110 opened (Marco Rossi, PhD ETH Zurich, ML Engineer)" });
+console.log("\n-- A. C-110 Marco Rossi, MSc ETH Zurich, final grade 4.25, 1 year, no production ML, default track standard --");
+let r = await send("open C-110 with the default track", "C-110", {}, { kind: "open", summary: "Application C-110 opened (Marco Rossi, MSc ETH Zurich, ML Engineer)" });
 expect("open: g_01 at risk, no intervention, prediction asked for the track step", [risk(r), ids(r), r.prediction?.stepId, r.prediction?.guardrailId], [["g_01"], [], "s_03", "g_01"]);
 expect("prediction question names the expert and the kind of case", r.prediction?.prompt, "Before you touch anything: what would Emilie do with this candidate, and why?");
 expect("response names the case", [r.caseId, r.caseType], ["C-110", "candidate"]);
-r = await send("opens the work history", "C-110", {}, { kind: "navigate", summary: "Work history of C-110 opened, 5 years of production ML at a bank visible" });
+r = await send("opens the education", "C-110", {}, { kind: "navigate", summary: "Education of C-110 opened, MSc ETH Zurich with final grade 4.25 visible" });
 expect("navigate: still no intervention", ids(r), []);
 r = await send("presses Advance with track standard, confirmation open", "C-110", {}, requested("C-110", "advance", "Advance"));
 expect("advance attempt: g_01 fires before the commit", ids(r), ["g_01:about_to_break"]);
 expect("question", r.violations[0]?.question, "Emilie would stop here. Why do you think?");
-expect("instruction carries the expert's quote", r.violations[0]?.instruction.includes(`"Three years or more of machine learning in production goes straight to the founder interview. It doesn't matter what the default says."`), true);
+expect("instruction carries the expert's quote", r.violations[0]?.instruction.includes(`"She's from ETH. ETH goes straight to the founder interview. It doesn't matter what the grades say."`), true);
 expect("instruction is worded from the action name", r.violations[0]?.instruction.includes(`The learner pressed "advance" and is about to advance candidate C-110 (Marco Rossi`), true);
 expect("instruction says nothing is confirmed yet", r.violations[0]?.instruction.includes("Speak now, before it is confirmed"), true);
 expect("field for the highlight", r.violations[0]?.field, "track");
@@ -272,8 +278,8 @@ expect("advance attempt: clean", [risk(r), ids(r)], [[], []]);
 r = await send("confirms", "C-110", { status: "advanced" }, { kind: "action", action: "advance", committed: true, summary: "Application C-110 advanced to interview" });
 expect("advance confirmed: clean", [risk(r), ids(r)], [[], []]);
 
-console.log("\n-- D. C-111 Sara Keller, MSc UZH --");
-r = await send("open C-111", "C-111", {}, { kind: "open", summary: "Application C-111 opened (Sara Keller, MSc UZH, ML Engineer)" });
+console.log("\n-- D. C-111 Sara Keller, PhD UZH, final grade 6.0, 8 years of production ML --");
+r = await send("open C-111", "C-111", {}, { kind: "open", summary: "Application C-111 opened (Sara Keller, PhD UZH, ML Engineer)" });
 expect("open: g_03 at risk, no intervention, prediction asked", [risk(r), ids(r), r.prediction?.stepId], [["g_03"], [], "s_06"]);
 r = await send("presses Advance, confirmation open", "C-111", {}, requested("C-111", "advance", "Advance"));
 expect("advance attempt: g_03 fires before the commit", ids(r), ["g_03:about_to_break"]);
@@ -285,7 +291,7 @@ expect("hold confirmed: clean", ids(r), []);
 expect("every rule response lists what it left undecided", r.undecided, []);
 
 console.log("\n-- E. C-112 David Chen, currently employed at an investor --");
-r = await send("open C-112", "C-112", {}, { kind: "open", summary: "Application C-112 opened (David Chen, MSc ETH Zurich, ML Engineer)" });
+r = await send("open C-112", "C-112", {}, { kind: "open", summary: "Application C-112 opened (David Chen, MSc EPFL, ML Engineer)" });
 expect("open: g_05 at risk, no intervention, prediction asked", [risk(r), ids(r), r.prediction?.guardrailId], [["g_05"], [], "g_05"]);
 r = await send("presses Advance, confirmation open", "C-112", {}, requested("C-112", "advance", "Advance"));
 expect("advance attempt: g_05 fires before the commit", ids(r), ["g_05:about_to_break"]);
@@ -299,15 +305,31 @@ expect("hold attempt: clean", [risk(r), ids(r)], [[], []]);
 r = await send("confirms the hold", "C-112", { status: "on_hold" }, { kind: "action", action: "hold", committed: true, summary: "Application C-112 put on hold" });
 expect("hold confirmed: clean", ids(r), []);
 
-console.log("\n-- F. Control: C-113 Lea Fischer, BSc ETH Zurich, 1 year, standard loop is right --");
-r = await send("open C-113", "C-113", {}, { kind: "open", summary: "Application C-113 opened (Lea Fischer, BSc ETH Zurich, ML Engineer)" });
+console.log("\n-- F. C-114 Chloé Martin, BSc HEC Lausanne, final grade 4.0, no experience --");
+r = await send("open C-114 with the default track", "C-114", {}, { kind: "open", summary: "Application C-114 opened (Chloé Martin, BSc HEC Lausanne, ML Engineer)" });
+expect("open: g_06 at risk, no intervention, prediction asked", [risk(r), ids(r), r.prediction?.stepId, r.prediction?.guardrailId], [["g_06"], [], "s_08", "g_06"]);
+r = await send("presses Advance with track standard, confirmation open", "C-114", {}, requested("C-114", "advance", "Advance"));
+expect("advance attempt: g_06 fires before the commit", ids(r), ["g_06:about_to_break"]);
+expect("g_06 instruction carries the expert's quote", r.violations[0]?.instruction.includes(`"HEC Lausanne. Best business school in the world. That is always the fast track."`), true);
+expect("g_06 field for the highlight", r.violations[0]?.field, "track");
+r = await send("changes track standard -> fast", "C-114", { track: "fast" }, { kind: "field_change", field: "track", before: "standard", after: "fast", committed: false, summary: "Track changed from Standard loop to Fast track" });
+expect("fast track set: g_06 satisfied, g_02 at risk, nothing said", [risk(r), ids(r)], [["g_02"], []]);
+r = await send("sets interviewer Reto", "C-114", { interviewer: "Reto" }, { kind: "field_change", field: "interviewer", before: "", after: "Reto", committed: false, summary: "Interviewer set to Reto" });
+expect("interviewer set: clean", [risk(r), ids(r)], [[], []]);
+r = await send("presses Advance, confirmation open", "C-114", {}, requested("C-114", "advance", "Advance"));
+expect("advance attempt: clean", [risk(r), ids(r)], [[], []]);
+r = await send("confirms", "C-114", { status: "advanced" }, { kind: "action", action: "advance", committed: true, summary: "Application C-114 advanced to interview" });
+expect("advance confirmed: clean", [risk(r), ids(r)], [[], []]);
+
+console.log("\n-- G. Control: C-113 Lea Fischer, MSc University of Bern, final grade 5.0, 2 years, standard loop is right --");
+r = await send("open C-113", "C-113", {}, { kind: "open", summary: "Application C-113 opened (Lea Fischer, MSc University of Bern, ML Engineer)" });
 expect("open: nothing at risk, no prediction", [r.atRisk.length, ids(r), r.prediction ?? null], [0, [], null]);
 r = await send("presses Advance, confirmation open", "C-113", {}, requested("C-113", "advance", "Advance"));
 expect("advance attempt: no intervention", ids(r), []);
 r = await send("confirms", "C-113", { status: "advanced" }, { kind: "action", action: "advance", committed: true, summary: "Application C-113 advanced to interview" });
 expect("advance confirmed: no intervention", ids(r), []);
 
-console.log("\n-- G. Idempotence: the same event checked twice --");
+console.log("\n-- H. Idempotence: the same event checked twice --");
 const again = await fetch(`${BASE}/api/teach/check`, {
   method: "POST",
   headers: { "content-type": "application/json" },
@@ -320,8 +342,11 @@ const sc = await fetch(`${BASE}/api/sessions/${session.id}/scorecard`, { method:
 for (const i of sc.items ?? []) console.log(`  ${i.status.padEnd(9)} ${i.id}  ${i.note}`);
 console.log(`  mastered: ${JSON.stringify(sc.scorecard?.mastered)}  practiceNext: ${JSON.stringify(sc.scorecard?.practiceNext)}`);
 console.log(`  interventions: ${sc.scorecard?.interventions.map((i) => `${i.guardrailId}@${i.learnerEventId}=${i.outcome ?? "open"}`).join(", ")}`);
-expect("scorecard: g_01, g_02, g_03 and g_05 to practice", sc.scorecard?.practiceNext, ["g_01", "g_02", "g_03", "g_05"]);
-expect("scorecard: every intervention ended corrected", sc.scorecard?.interventions.map((i) => i.outcome), ["corrected", "corrected", "corrected", "corrected", "corrected"]);
+expect("scorecard: g_01, g_03, g_05 and g_06 to practice", sc.scorecard?.practiceNext, ["g_01", "g_03", "g_05", "g_06"]);
+// g_02 was caught on C-110, then met on C-114 with the interviewer set unprompted.
+expect("scorecard: g_02 mastered on the second fast-track case", [sc.scorecard?.mastered, sc.items?.find((i) => i.id === "g_02")?.note], [["g_02"], "Handled on candidate C-114 without help."]);
+expect("scorecard: one intervention per attempt, in order", sc.scorecard?.interventions.map((i) => i.guardrailId), ["g_01", "g_01", "g_02", "g_03", "g_05", "g_06"]);
+expect("scorecard: every intervention ended corrected", sc.scorecard?.interventions.map((i) => i.outcome), ["corrected", "corrected", "corrected", "corrected", "corrected", "corrected"]);
 expect("scorecard: g_04 did not come up", sc.items?.find((i) => i.id === "g_04")?.status, "not_seen");
 expect("scorecard: notes name the case", sc.items?.find((i) => i.id === "g_03")?.note, "Caught before confirming on candidate C-111, then corrected. Not yet done without help.");
 
@@ -361,7 +386,7 @@ if (process.env.SKIP_MODEL === "1") {
   expect("model pass: the instruction carries the expert's quote", m.violations[0]?.instruction.includes(g.g_03.quote.text), true);
 
   const wrongTrack = { id: "sim_m2", t: 12000, source: "dom", ...requested("C-110", "advance", "Advance"), entity: { type: "candidate", id: "C-110" }, facts: { ...CASES["C-110"], track: "standard", interviewer: "", status: "open" } };
-  console.log("\n[sim_m2] 5 years of production ML on the standard loop, learner presses Advance (rule violation plus an undecided guardrail)");
+  console.log("\n[sim_m2] ETH Zurich application on the standard loop, learner presses Advance (rule violation plus an undecided guardrail)");
   m = await post(wrongTrack, false);
   expect("rule pass: g_01 fires at once", ids(m), ["g_01:about_to_break"]);
   const hold = { ...attempt, id: "sim_m3", t: 18000, ...requested("C-111", "hold", "Hold") };

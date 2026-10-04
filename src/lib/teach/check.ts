@@ -318,7 +318,7 @@ export function factNames(workMap: Pick<WorkMap, "guardrails">): string[] {
 }
 
 // The facts of a case as short readable parts, in the order the facts come:
-// "Marco Rossi", "degree PhD", "has production ml", "track standard",
+// "Marco Rossi", "degree MSc", "final grade 4.25", "track standard",
 // "no interviewer". Ids, the status, and flags that are false are left out.
 // An empty fact is only mentioned when a guardrail looks at it (`relevant`).
 export function caseParts(f: CaseFacts, relevant: readonly string[] = []): string[] {
@@ -334,7 +334,7 @@ export function caseParts(f: CaseFacts, relevant: readonly string[] = []): strin
   return parts;
 }
 
-// "candidate C-110 (Marco Rossi, degree PhD, university ETH Zurich, ...)".
+// "candidate C-110 (Marco Rossi, university ETH Zurich, degree MSc, ...)".
 export function describeCase(f: CaseFacts, opts: { type?: string; id?: string; relevant?: readonly string[] } = {}): string {
   const found = idFact(f);
   const type = opts.type ?? found?.type ?? "case";

@@ -21,11 +21,12 @@ export type ScreenEventKind = "open" | "navigate" | "field_change" | "action" | 
 // The facts of the case on screen that guardrail checks are evaluated against.
 // The keys depend on the workflow; the sandbox sends them with every DOM event
 // and for other apps the vision model fills in what it can read. The hiring
-// sandbox uses: candidate_id, name, role, university, degree,
-// years_experience, has_production_ml, salary_expectation, referred_by_employee,
-// referrer, current_employer, employer_is_partner, track ("standard" | "fast" |
-// "research"), interviewer, status ("open" | "advanced" | "on_hold" |
-// "escalated" | "rejected").
+// sandbox uses: candidate_id, name, role, university, degree, final_grade
+// (Swiss scale: 6.0 is best, 4.0 is the pass mark), years_experience,
+// has_production_ml, salary_expectation, referred_by_employee, referrer,
+// current_employer ("none" when there is none), employer_is_partner, track
+// ("standard" | "fast" | "research"), interviewer, status ("open" | "advanced" |
+// "on_hold" | "escalated" | "rejected").
 export type CaseFacts = Record<string, string | number | boolean | undefined>;
 
 export type ScreenEvent = {
@@ -90,7 +91,7 @@ export type ScreenMoment = { t: number; frameId: string; label: string }; // "03
 // A machine-checkable form of a guardrail, when one can be derived. The tutor
 // evaluates it against the learner's case; `rule` stays the source of truth.
 export type GuardrailCheck = {
-  when: string; // condition on the case, e.g. "has_production_ml && years_experience >= 3"
+  when: string; // condition on the case, e.g. "university == 'ETH Zurich'"
   require?: string; // e.g. "track == 'fast'"
   forbid?: string; // e.g. "action == 'advance' && !interviewer"
 };

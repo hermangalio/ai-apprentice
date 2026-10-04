@@ -219,7 +219,7 @@ function ClarifyMock() {
         <span className="ai-pulse inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white">Answer by voice</span>
       </div>
       <div className="rounded-xl border border-stone-200 bg-indigo-50/40 p-4">
-        <p className="text-sm text-stone-700">Three years of ML in production, so she goes straight to the founders…</p>
+        <p className="text-sm text-stone-700">She's from ETH. ETH goes straight to the founders…</p>
         <div className="mt-3 space-y-2">
           <Bar w="85%" accent />
           <Bar w="60%" accent />
@@ -230,7 +230,7 @@ function ClarifyMock() {
 }
 
 function MapMock() {
-  const steps = ["Open the application", "Check the work history", "Choose the interview track", "Assign an interviewer", "Advance or hold"];
+  const steps = ["Open the application", "Check the university", "Choose the interview track", "Assign an interviewer", "Advance or hold"];
   return (
     <Window title="Work Map">
       <div className="grid grid-cols-[0.9fr_1.3fr]">
@@ -269,7 +269,7 @@ function MapMock() {
 }
 
 function TeachMock() {
-  const steps = ["Open the application", "Check the work history", "Choose the interview track", "Advance to interview"];
+  const steps = ["Open the application", "Check the university", "Choose the interview track", "Advance to interview"];
   return (
     <Window title="Practice">
       <div className="grid grid-cols-[0.9fr_1.3fr]">

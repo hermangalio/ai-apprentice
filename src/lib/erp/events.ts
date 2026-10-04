@@ -50,6 +50,7 @@ export function caseFacts(candidate: Candidate): CaseFacts {
     role: candidate.role,
     university: candidate.university,
     degree: candidate.degree,
+    final_grade: candidate.finalGrade,
     years_experience: candidate.yearsExperience,
     has_production_ml: candidate.hasProductionMl,
     salary_expectation: candidate.salaryExpectation,
@@ -66,6 +67,11 @@ export function caseFacts(candidate: Candidate): CaseFacts {
 // 125000 -> "CHF 125,000"
 export function formatCHF(amount: number): string {
   return "CHF " + amount.toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
+// Swiss grades with at least one decimal: 4 -> "4.0", 5.5 -> "5.5", 4.25 -> "4.25".
+export function gradeLabel(grade: number): string {
+  return Number.isInteger(grade * 10) ? grade.toFixed(1) : String(grade);
 }
 
 export function yearsLabel(n: number): string {
@@ -120,13 +126,18 @@ export function workHistoryOpenedSummary(c: Candidate): string {
   if (c.hasProductionMl) {
     return `Work history of ${c.id} opened, ${yearsLabel(c.productionMlYears)} of production ML at ${c.productionMlAt} visible`;
   }
+  if (c.yearsExperience === 0) return `Work history of ${c.id} opened, no work experience visible`;
   return `Work history of ${c.id} opened, ${yearsLabel(c.yearsExperience)} of experience and no production ML visible`;
 }
 
+// A doctorate is named with its field ("PhD in Machine Learning at UZH"), any
+// other degree as in the queue ("BSc ETH Zurich"). The final grade is the
+// candidate's, which belongs to the highest degree.
 export function educationOpenedSummary(c: Candidate): string {
   const top = c.education[0];
   if (!top) return `Education of ${c.id} opened, no entries`;
-  return `Education of ${c.id} opened, ${top.degree} ${top.field} at ${top.university} visible`;
+  const degree = top.degree === "PhD" ? `${top.degree} in ${top.field} at ${top.university}` : `${top.degree} ${top.university}`;
+  return `Education of ${c.id} opened, ${degree} with final grade ${gradeLabel(c.finalGrade)} visible`;
 }
 
 export function referralOpenedSummary(c: Candidate): string {

@@ -13,6 +13,36 @@ export type LLMRequest = {
   model?: "haiku" | "sonnet" | "opus";
 };
 
+// On a server there is no Claude Code login. With LLM_BACKEND=api and an
+// ANTHROPIC_API_KEY the same calls go straight to the Messages API instead.
+const API_MODE = process.env.LLM_BACKEND === "api" && !!process.env.ANTHROPIC_API_KEY;
+const API_MODELS = { haiku: "claude-haiku-4-5-20251001", sonnet: "claude-sonnet-5-5", opus: "claude-opus-5-5" } as const;
+
+type ApiBlock = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+type ApiMessage = { role: "user" | "assistant"; content: ApiBlock[] | string };
+
+function userBlocks(prompt: string, images: LLMImage[] = []): ApiBlock[] {
+  return [
+    { type: "text", text: prompt },
+    ...images.map((img) => ({ type: "image" as const, source: { type: "base64" as const, media_type: img.mediaType, data: img.base64 } })),
+  ];
+}
+
+async function apiCall(system: string, messages: ApiMessage[], model: LLMRequest["model"] = "haiku"): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY as string,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: API_MODELS[model ?? "haiku"], max_tokens: 8000, system, messages }),
+  });
+  if (!res.ok) throw new Error(`LLM call failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  return (data.content ?? []).map((c) => (c.type === "text" ? (c.text ?? "") : "")).join("");
+}
+
 function extractJSON(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const body = fenced ? fenced[1] : text;
@@ -24,6 +54,7 @@ function extractJSON(text: string): unknown {
 }
 
 export async function llmText(req: LLMRequest): Promise<string> {
+  if (API_MODE) return apiCall(req.system, [{ role: "user", content: userBlocks(req.prompt, req.images) }], req.model);
   async function* input(): AsyncGenerator<SDKUserMessage> {
     yield {
       type: "user",
@@ -85,6 +116,9 @@ export class WarmSession {
   private calls = 0;
   private running = false;
   private closed = false;
+  // API mode: the conversation so far, and a chain that serializes calls.
+  private history: ApiMessage[] = [];
+  private chain: Promise<unknown> = Promise.resolve();
 
   private opts: { system: string; model?: LLMRequest["model"]; maxCalls?: number };
 
@@ -95,12 +129,25 @@ export class WarmSession {
   // Ends the underlying process once the call in flight (if any) has finished.
   close() {
     this.closed = true;
+    this.history = [];
     for (const p of this.pending.splice(0)) p.reject(new Error("WarmSession closed"));
     if (!this.inFlight) this.wake?.();
   }
 
   ask(prompt: string, images: LLMImage[] = []): Promise<string> {
     if (this.closed) return Promise.reject(new Error("WarmSession closed"));
+    if (API_MODE) {
+      const run = this.chain.then(async () => {
+        const system = `${this.opts.system}\n\nRespond with a single JSON value and nothing else.`;
+        const turn: ApiMessage = { role: "user", content: userBlocks(prompt, images) };
+        const text = await apiCall(system, [...this.history, turn], this.opts.model);
+        // Keep the last few exchanges as context (the previous frames).
+        this.history = [...this.history, turn, { role: "assistant" as const, content: text }].slice(-6);
+        return text;
+      });
+      this.chain = run.catch(() => {});
+      return run;
+    }
     const msg = {
       type: "user",
       parent_tool_use_id: null,

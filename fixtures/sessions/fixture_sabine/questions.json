@@ -43,27 +43,27 @@
   },
   {
     "id": "q_04",
-    "kind": "guardrail",
-    "text": "You held the UZH application. Is that for every university, and who decides when it moves?",
+    "kind": "reason",
+    "text": "You moved Maxime to the fast track as well. Why?",
     "eventIds": [
-      "evt_09"
+      "evt_13"
     ],
     "status": "answered",
-    "askedAt": 455000,
-    "askedIn": "debrief",
+    "askedAt": 500000,
+    "askedIn": "capture",
     "answerTranscriptIds": [
       "tr_10"
     ]
   },
   {
     "id": "q_05",
-    "kind": "reason",
-    "text": "Why does a referral go to the founders?",
+    "kind": "guardrail",
+    "text": "You held the UZH application although it was the strongest CV of the four. Is that for every university, and who decides when it moves?",
     "eventIds": [
-      "evt_11"
+      "evt_09"
     ],
     "status": "answered",
-    "askedAt": 474000,
+    "askedAt": 535000,
     "askedIn": "debrief",
     "answerTranscriptIds": [
       "tr_12"
@@ -71,14 +71,28 @@
   },
   {
     "id": "q_06",
+    "kind": "reason",
+    "text": "Why does a referral go to the founders?",
+    "eventIds": [
+      "evt_11"
+    ],
+    "status": "answered",
+    "askedAt": 554000,
+    "askedIn": "debrief",
+    "answerTranscriptIds": [
+      "tr_14"
+    ]
+  },
+  {
+    "id": "q_07",
     "kind": "exception",
     "text": "What do you do when the applicant currently works for one of your investors or customers?",
     "eventIds": [],
     "status": "answered",
-    "askedAt": 490000,
+    "askedAt": 570000,
     "askedIn": "debrief",
     "answerTranscriptIds": [
-      "tr_14"
+      "tr_16"
     ]
   }
 ]

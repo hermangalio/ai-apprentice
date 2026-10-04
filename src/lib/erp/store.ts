@@ -5,7 +5,8 @@ import { seedCandidates, type EditableFields, type ErpSet, type Candidate, type 
 
 export type ErpState = { set: ErpSet; sets: Record<ErpSet, Candidate[]> };
 
-const STORAGE_KEY = "hiring.state.v1";
+// Bump the version when the seed changes shape, so stored data from an older seed is dropped.
+const STORAGE_KEY = "hiring.state.v2";
 
 let state: ErpState | null = null;
 const listeners = new Set<() => void>();
